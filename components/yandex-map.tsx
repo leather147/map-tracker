@@ -1,34 +1,36 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useStore } from "@/lib/store"
 import { BeaconMarker } from "@/components/beacon-marker"
 import { MapFallback } from "@/components/map-fallback"
-import { cn } from "@/lib/utils"
 import type { LatLng } from "@/lib/types"
 
 const API_KEY = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY
 
 declare global {
   interface Window {
-    ymaps?: any
+    ymaps3?: any
   }
 }
 
 let scriptPromise: Promise<any> | null = null
 
-function loadYmaps(): Promise<any> {
+// Loads the Yandex Maps JS API v3. v3 supports a real, native dark theme,
+// so we no longer apply any CSS filter on top of the tiles.
+function loadYmaps3(): Promise<any> {
   if (typeof window === "undefined") return Promise.reject("no window")
-  if (window.ymaps?.Map) return Promise.resolve(window.ymaps)
+  if (window.ymaps3?.ready) return window.ymaps3.ready.then(() => window.ymaps3)
   if (!API_KEY) return Promise.reject("no-key")
   if (scriptPromise) return scriptPromise
 
   scriptPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script")
-    script.src = `https://api-maps.yandex.ru/2.1/?apikey=${API_KEY}&lang=ru_RU`
+    script.src = `https://api-maps.yandex.ru/v3/?apikey=${API_KEY}&lang=ru_RU`
     script.async = true
     script.onload = () => {
-      window.ymaps.ready(() => resolve(window.ymaps))
+      window.ymaps3.ready.then(() => resolve(window.ymaps3)).catch(reject)
     }
     script.onerror = () => reject("load-error")
     document.head.appendChild(script)
@@ -37,6 +39,10 @@ function loadYmaps(): Promise<any> {
 }
 
 type Status = "loading" | "ready" | "fallback"
+
+// store order is [lat, lng]; Yandex v3 uses [lng, lat]
+const toYmaps = (p: LatLng): [number, number] => [p[1], p[0]]
+const fromYmaps = (p: number[]): LatLng => [p[1], p[0]]
 
 export function YandexMap() {
   const {
@@ -48,51 +54,75 @@ export function YandexMap() {
     position,
     settings,
     centerRequest,
-    objects,
+    placeBeacon,
   } = useStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
+  const markerRef = useRef<any>(null)
   const trafficRef = useRef<any>(null)
-  const projChangeRef = useRef(false)
-  const positionRef = useRef<LatLng>(position)
-  positionRef.current = position
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+
+  // stable callbacks for the map listener
+  const placeRef = useRef(placeBeacon)
+  placeRef.current = placeBeacon
+  const setZoomRef = useRef(setZoom)
+  setZoomRef.current = setZoom
+
   const [status, setStatus] = useState<Status>(API_KEY ? "loading" : "fallback")
-  // pixel position of beacon for the HTML overlay marker
-  const [pixel, setPixel] = useState<{ x: number; y: number } | null>(null)
+  // DOM element hosting the React beacon marker (rendered via portal)
+  const [markerEl, setMarkerEl] = useState<HTMLElement | null>(null)
 
   // init map
   useEffect(() => {
     let cancelled = false
-    loadYmaps()
-      .then((ymaps) => {
+    loadYmaps3()
+      .then((ymaps3) => {
         if (cancelled || !containerRef.current || mapRef.current) return
-        const map = new ymaps.Map(
-          containerRef.current,
-          {
-            center: position,
-            zoom,
-            controls: [],
-          },
-          {
-            suppressMapOpenBlock: true,
-            yandexMapDisablePoiInteractivity: true,
-          },
-        )
-        mapRef.current = map
-        // force dark ("black") map tiles regardless of UI theme
-        map.options.set("theme", "dark")
-        trafficRef.current = new ymaps.control.TrafficControl({ shown: false })
-        map.controls.add(trafficRef.current)
+        const {
+          YMap,
+          YMapDefaultSchemeLayer,
+          YMapDefaultFeaturesLayer,
+          YMapListener,
+          YMapMarker,
+        } = ymaps3
 
-        const sync = () => {
-          if (cancelled) return
-          setZoom(map.getZoom())
-          updatePixel()
-        }
-        map.events.add(["boundschange", "actionend"], sync)
+        const map = new YMap(containerRef.current, {
+          location: { center: toYmaps(position), zoom },
+          // native dark theme straight from the API — no overlay filters
+          theme: "dark",
+          behaviors: ["drag", "pinchZoom", "scrollZoom", "dblClick", "mouseRotate"],
+        })
+        mapRef.current = map
+
+        map.addChild(new YMapDefaultSchemeLayer({ theme: "dark" }))
+        map.addChild(new YMapDefaultFeaturesLayer())
+
+        // beacon marker (hosts a React-rendered element via portal)
+        const el = document.createElement("div")
+        el.style.pointerEvents = "none"
+        const marker = new YMapMarker({ coordinates: toYmaps(position), zIndex: 1000 }, el)
+        markerRef.current = marker
+        map.addChild(marker)
+        if (!cancelled) setMarkerEl(el)
+
+        // sync zoom on user interaction + place beacon on click
+        const listener = new YMapListener({
+          layer: "any",
+          onUpdate: ({ location }: any) => {
+            if (cancelled || !location) return
+            const z = Math.round(location.zoom)
+            if (z !== zoomRef.current) setZoomRef.current(z)
+          },
+          onClick: (_object: any, event: any) => {
+            if (cancelled || !event?.coordinates) return
+            placeRef.current(fromYmaps(event.coordinates))
+          },
+        })
+        map.addChild(listener)
+
         setStatus("ready")
-        requestAnimationFrame(updatePixel)
       })
       .catch(() => {
         if (!cancelled) setStatus("fallback")
@@ -100,82 +130,93 @@ export function YandexMap() {
     return () => {
       cancelled = true
       if (mapRef.current) {
-        mapRef.current.destroy()
+        try {
+          mapRef.current.destroy()
+        } catch {
+          /* noop */
+        }
         mapRef.current = null
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const updatePixel = () => {
+  // traffic layer toggle (best-effort dynamic import; degrades gracefully)
+  useEffect(() => {
     const map = mapRef.current
-    if (!map) return
-    try {
-      const projection = map.options.get("projection")
-      const z = map.getZoom()
-      const globalPx = projection.toGlobalPixels(positionRef.current, z)
-      const centerPx = map.getGlobalPixelCenter()
-      const size = map.container.getSize() // [width, height]
-      setPixel({
-        x: size[0] / 2 + (globalPx[0] - centerPx[0]),
-        y: size[1] / 2 + (globalPx[1] - centerPx[1]),
-      })
-    } catch {
-      setPixel(null)
+    const ymaps3 = window.ymaps3
+    if (!map || !ymaps3) return
+    let cancelled = false
+
+    async function apply() {
+      if (layers.traffic) {
+        if (!trafficRef.current) {
+          try {
+            const pkg = await ymaps3.import("@yandex/ymaps3-traffic@0.0.1")
+            if (cancelled) return
+            trafficRef.current = new pkg.YMapTrafficLayer()
+            map.addChild(trafficRef.current)
+          } catch {
+            /* traffic package unavailable — ignore */
+          }
+        }
+      } else if (trafficRef.current) {
+        try {
+          map.removeChild(trafficRef.current)
+        } catch {
+          /* noop */
+        }
+        trafficRef.current = null
+      }
     }
-  }
+    apply()
+    return () => {
+      cancelled = true
+    }
+  }, [layers.traffic, status])
 
-  // map tiles are forced to the dark ("black") theme regardless of UI theme
-
-  // layers
+  // external zoom control (zoom buttons)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    // when labels are off, use the skeleton (label-less) map; otherwise public/standard
-    const type = !layers.labels
-      ? "yandex#map"
-      : layers.transport
-        ? "yandex#publicMap"
-        : "yandex#map"
-    map.setType(type)
-    if (trafficRef.current) {
-      if (layers.traffic) trafficRef.current.showTraffic()
-      else trafficRef.current.hideTraffic()
+    if (Math.round(map.zoom) !== zoom) {
+      map.setLocation({ zoom, duration: 200 })
     }
-  }, [layers, status])
-
-  // external zoom control
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    if (map.getZoom() !== zoom) map.setZoom(zoom, { duration: 200 })
   }, [zoom])
 
-  // rotation
+  // rotation (movement mode rotates the camera by heading)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    const targetAzimuth = rotationMode === "movement" ? (heading * Math.PI) / 180 : 0
+    const azimuth = rotationMode === "movement" ? (heading * Math.PI) / 180 : 0
     try {
-      map.options.set("azimuth", targetAzimuth)
+      map.setCamera({ azimuth, duration: 300 })
     } catch {
-      /* projection without rotation support */
+      /* noop */
     }
   }, [rotationMode, heading])
 
-  // beacon position -> recenter softly only on follow, always reproject marker
+  // beacon position -> move marker
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-    updatePixel()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const marker = markerRef.current
+    if (marker) {
+      try {
+        marker.update({ coordinates: toYmaps(position) })
+      } catch {
+        /* noop */
+      }
+    }
   }, [position])
 
-  // center request
+  // center request (LocateFixed button)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !centerRequest) return
-    map.panTo(centerRequest.position, { duration: 400 }).then(updatePixel)
+    try {
+      map.setLocation({ center: toYmaps(centerRequest.position), duration: 400 })
+    } catch {
+      /* noop */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerRequest])
 
@@ -185,27 +226,7 @@ export function YandexMap() {
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* hide Yandex logo + copyright strip */}
-      <style>{`
-        [class*="ymaps"][class*="-copyright"],
-        [class*="ymaps"][class*="-copyrights-pane"],
-        [class*="ymaps"][class*="-gototech"] {
-          display: none !important;
-        }
-      `}</style>
-      {/* container is taller than the viewport so any residual bottom strip is cropped */}
-      <div
-        ref={containerRef}
-        className="absolute inset-x-0 top-0"
-        style={{
-          height: "calc(100% + 26px)",
-          filter: layers.labels
-            ? "brightness(0.2) contrast(1.35) saturate(0.45) hue-rotate(200deg)"
-            : "brightness(0.17) contrast(1.4) saturate(0.3) hue-rotate(200deg)",
-          transition: "filter 0.5s cubic-bezier(0.22,1,0.36,1)",
-        }}
-        aria-label="Карта Санкт-Петербурга"
-      />
+      <div ref={containerRef} className="absolute inset-0" aria-label="Карта Санкт-Петербурга" />
       {status === "loading" && (
         <div className="absolute inset-0 grid animate-fade-in place-items-center bg-background">
           <div className="flex items-center gap-3 text-muted-foreground">
@@ -214,7 +235,7 @@ export function YandexMap() {
           </div>
         </div>
       )}
-      {settings.visible && pixel && <BeaconMarker x={pixel.x} y={pixel.y} />}
+      {settings.visible && markerEl && createPortal(<BeaconMarker centered />, markerEl)}
     </div>
   )
 }

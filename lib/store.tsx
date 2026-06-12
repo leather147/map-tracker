@@ -53,8 +53,8 @@ function uid(): string {
 const DEFAULT_SETTINGS: BeaconSettings = {
   visible: true,
   autoMove: true,
-  intervalMs: 2500,
-  stepMeters: 60,
+  intervalMs: 2000,
+  stepMeters: 18,
   direction: "NE",
   followRoute: true,
   scheduledMove: false,
@@ -149,6 +149,7 @@ interface StoreValue {
   street: string
   moving: boolean
   moveOnce: () => void
+  placeBeacon: (pos: LatLng) => void
 
   // data
   objects: TrackedObject[]
@@ -211,6 +212,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   // refs for the movement engine (avoid stale closures / re-subscribing)
   const routeIndexRef = useRef(1)
   const stepCountRef = useRef(0)
+  const walkHeadingRef = useRef(bearingFromDirection(DEFAULT_SETTINGS.direction))
   const settingsRef = useRef(settings)
   const positionRef = useRef(position)
   const insideRef = useRef<string[]>(insideGeofenceIds)
@@ -311,15 +313,26 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   const performMove = useCallback(() => {
     const s = settingsRef.current
     const from = positionRef.current
-    let to: LatLng
 
+    // Determine the heading for this step.
+    // - In "follow streets" mode the beacon meanders, turning gently most of
+    //   the time and occasionally making a ~90° turn at a junction.
+    // - Otherwise it follows the fixed direction chosen by the user.
+    let heading: number
     if (s.followRoute) {
-      const idx = routeIndexRef.current % SPB_ROUTE.length
-      to = SPB_ROUTE[idx]
-      routeIndexRef.current = (routeIndexRef.current + 1) % SPB_ROUTE.length
+      const r = Math.random()
+      let turn: number
+      if (r < 0.7) turn = (Math.random() - 0.5) * 24
+      else if (r < 0.9) turn = (Math.random() < 0.5 ? 1 : -1) * 90
+      else turn = (Math.random() - 0.5) * 50
+      heading = (walkHeadingRef.current + turn + 360) % 360
     } else {
-      to = moveByDistance(from, s.stepMeters, bearingFromDirection(s.direction))
+      heading = bearingFromDirection(s.direction)
     }
+    walkHeadingRef.current = heading
+
+    // Small, realistic step starting from the current position.
+    const to = moveByDistance(from, s.stepMeters, heading)
 
     const dist = distanceMeters(from, to)
     const speed = Math.round((dist / (s.intervalMs / 1000)) * 3.6)
@@ -330,14 +343,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
     setSpeedKmh(speed)
     setStreet(nextStreet)
     setMoving(true)
-
-    // heading for movement-based rotation
-    setHeading(() => {
-      const dLat = to[0] - from[0]
-      const dLng = to[1] - from[1]
-      const angle = (Math.atan2(dLng, dLat) * 180) / Math.PI
-      return (angle + 360) % 360
-    })
+    setHeading(heading)
 
     pushHistory({
       position: to,
@@ -355,6 +361,28 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   const moveOnce = useCallback(() => {
     performMove()
   }, [performMove])
+
+  // Place the beacon at an explicit position (user taps/clicks the map).
+  // Auto-movement then continues from this point.
+  const placeBeacon = useCallback(
+    (pos: LatLng) => {
+      stepCountRef.current += 1
+      const nextStreet = streetForIndex(stepCountRef.current)
+      setPosition(pos)
+      setSpeedKmh(0)
+      setStreet(nextStreet)
+      setMoving(false)
+      pushHistory({
+        position: pos,
+        speedKmh: 0,
+        street: nextStreet,
+        event: "manual",
+        note: "Маяк установлен вручную",
+      })
+      evaluateGeofences(pos)
+    },
+    [evaluateGeofences, pushHistory],
+  )
 
   // auto-move loop
   useEffect(() => {

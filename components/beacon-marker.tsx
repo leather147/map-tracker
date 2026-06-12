@@ -5,14 +5,26 @@ import { Navigation, Gauge, MapPin, BatteryMedium, X } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
-export function BeaconMarker({ x, y }: { x: number; y: number }) {
+export function BeaconMarker({
+  x,
+  y,
+  centered = false,
+}: {
+  x?: number
+  y?: number
+  centered?: boolean
+}) {
   const { settings, position, speedKmh, street, moving } = useStore()
   const [open, setOpen] = useState(false)
 
   return (
     <div
       className="pointer-events-none absolute z-20"
-      style={{ left: x, top: y, transform: "translate(-50%, -50%)" }}
+      style={
+        centered
+          ? { left: 0, top: 0, transform: "translate(-50%, -50%)" }
+          : { left: x, top: y, transform: "translate(-50%, -50%)" }
+      }
     >
       {/* pulse ring */}
       {settings.pulseEnabled && (

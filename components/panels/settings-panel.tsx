@@ -121,15 +121,18 @@ export function SettingsPanel() {
           </Section>
 
           <Section title="Передвижение">
+            <p className="text-xs text-muted-foreground">
+              Нажмите на карту, чтобы установить маяк в нужную точку — отсюда он и продолжит движение.
+            </p>
             <ToggleRow
               label="Автодвижение"
-              desc="Повторяющийся сигнал о передвижении"
+              desc="Маяк периодически смещается по улицам"
               checked={settings.autoMove}
               onChange={(v) => updateSettings({ autoMove: v })}
             />
             <div className="h-px bg-border" />
             <SliderRow
-              label="Интервал сигнала"
+              label="Тайминг обновления позиции"
               value={settings.intervalMs}
               display={`${(settings.intervalMs / 1000).toFixed(1)} c`}
               min={500}
@@ -139,8 +142,8 @@ export function SettingsPanel() {
             />
             <div className="h-px bg-border" />
             <ToggleRow
-              label="Двигаться по маршруту"
-              desc="Следовать улицам центра СПб"
+              label="Двигаться по улицам"
+              desc="Плавно перемещаться от текущей точки"
               checked={settings.followRoute}
               onChange={(v) => updateSettings({ followRoute: v })}
             />
