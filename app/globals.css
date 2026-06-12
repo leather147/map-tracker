@@ -185,13 +185,12 @@
     inset 0 1px 0 0 color-mix(in oklch, var(--foreground) 10%, transparent);
 }
 
-/* ===== Black Yandex map: darken tiles + fade out POI/establishment labels ===== */
-.map-canvas {
-  filter: brightness(0.32) contrast(1.25) saturate(0.5) hue-rotate(195deg);
+/* ===== Dark-theme Yandex map filter =====
+   Applied only to the map container div when theme === "dark" AND the real
+   Yandex v2.1 tiles are loaded. Inverts the light base map to dark. */
+.map-dark-filter {
+  filter: invert(90%) hue-rotate(180deg);
   transition: filter 0.5s var(--ease-glass, ease);
-}
-.map-canvas.labels-off {
-  filter: brightness(0.28) contrast(1.3) saturate(0.35) hue-rotate(195deg);
 }
 
 /* ===== Smooth entrance animations ===== */
