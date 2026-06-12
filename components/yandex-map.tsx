@@ -55,6 +55,8 @@ export function YandexMap() {
   const mapRef = useRef<any>(null)
   const trafficRef = useRef<any>(null)
   const projChangeRef = useRef(false)
+  const positionRef = useRef<LatLng>(position)
+  positionRef.current = position
   const [status, setStatus] = useState<Status>(API_KEY ? "loading" : "fallback")
   // pixel position of beacon for the HTML overlay marker
   const [pixel, setPixel] = useState<{ x: number; y: number } | null>(null)
@@ -105,9 +107,14 @@ export function YandexMap() {
     if (!map) return
     try {
       const projection = map.options.get("projection")
-      const global = projection.toGlobalPixels(position, map.getZoom())
-      const offset = map.converter.pageFromGlobal(global)
-      setPixel({ x: offset[0], y: offset[1] })
+      const z = map.getZoom()
+      const globalPx = projection.toGlobalPixels(positionRef.current, z)
+      const centerPx = map.getGlobalPixelCenter()
+      const size = map.container.getSize() // [width, height]
+      setPixel({
+        x: size[0] / 2 + (globalPx[0] - centerPx[0]),
+        y: size[1] / 2 + (globalPx[1] - centerPx[1]),
+      })
     } catch {
       setPixel(null)
     }
