@@ -26,6 +26,9 @@ import {
   bearingFromDirection,
   distanceMeters,
   moveByDistance,
+  nearestNode,
+  pickNextNode,
+  bearing as calcBearing,
 } from "@/lib/geo"
 import { playBeep } from "@/lib/sound"
 
@@ -53,8 +56,8 @@ function uid(): string {
 const DEFAULT_SETTINGS: BeaconSettings = {
   visible: true,
   autoMove: true,
-  intervalMs: 2500,
-  stepMeters: 60,
+  intervalMs: 2000,
+  stepMeters: 18,
   direction: "NE",
   followRoute: true,
   scheduledMove: false,
@@ -149,6 +152,7 @@ interface StoreValue {
   street: string
   moving: boolean
   moveOnce: () => void
+  placeBeacon: (pos: LatLng) => void
 
   // data
   objects: TrackedObject[]
@@ -209,9 +213,11 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   const [insideGeofenceIds, setInsideGeofenceIds] = useState<string[]>([])
 
   // refs for the movement engine (avoid stale closures / re-subscribing)
-  const routeIndexRef = useRef(1)
-  const stepCountRef = useRef(0)
-  const settingsRef = useRef(settings)
+  const stepCountRef    = useRef(0)
+  // Street-graph walker: current node + arrival bearing
+  const currentNodeRef  = useRef(nearestNode(SPB_ROUTE[0]))
+  const arrivalBearingRef = useRef(45) // initial heading NE
+  const settingsRef     = useRef(settings)
   const positionRef = useRef(position)
   const insideRef = useRef<string[]>(insideGeofenceIds)
   const geofencesRef = useRef(geofences)
@@ -311,17 +317,40 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   const performMove = useCallback(() => {
     const s = settingsRef.current
     const from = positionRef.current
+
     let to: LatLng
+    let heading: number
 
     if (s.followRoute) {
-      const idx = routeIndexRef.current % SPB_ROUTE.length
-      to = SPB_ROUTE[idx]
-      routeIndexRef.current = (routeIndexRef.current + 1) % SPB_ROUTE.length
+      const node = currentNodeRef.current
+      const arrivalBearing = arrivalBearingRef.current
+
+      // How far are we from the current target node?
+      const distToNode = distanceMeters(from, node.pos)
+
+      if (distToNode <= s.stepMeters) {
+        // We have reached (or overshot) the current node — pick the next segment.
+        // `pickNextNode` forbids near-180° reversals: always forward or sideways.
+        const { node: nextNode, exitBearing } = pickNextNode(node, arrivalBearing)
+        currentNodeRef.current = nextNode
+        arrivalBearingRef.current = exitBearing
+        // Step from the node toward the next one
+        heading = exitBearing
+        to = moveByDistance(node.pos, s.stepMeters, heading)
+      } else {
+        // Still travelling toward the current node — keep the same bearing.
+        heading = calcBearing(from, node.pos)
+        to = moveByDistance(from, s.stepMeters, heading)
+      }
     } else {
-      to = moveByDistance(from, s.stepMeters, bearingFromDirection(s.direction))
+      heading = bearingFromDirection(s.direction)
+      to = moveByDistance(from, s.stepMeters, heading)
+      // Keep graph in sync so switching back to route mode works sensibly
+      currentNodeRef.current  = nearestNode(to)
+      arrivalBearingRef.current = heading
     }
 
-    const dist = distanceMeters(from, to)
+    const dist  = distanceMeters(from, to)
     const speed = Math.round((dist / (s.intervalMs / 1000)) * 3.6)
     stepCountRef.current += 1
     const nextStreet = streetForIndex(stepCountRef.current)
@@ -330,21 +359,9 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
     setSpeedKmh(speed)
     setStreet(nextStreet)
     setMoving(true)
+    setHeading(heading)
 
-    // heading for movement-based rotation
-    setHeading(() => {
-      const dLat = to[0] - from[0]
-      const dLng = to[1] - from[1]
-      const angle = (Math.atan2(dLng, dLat) * 180) / Math.PI
-      return (angle + 360) % 360
-    })
-
-    pushHistory({
-      position: to,
-      speedKmh: speed,
-      street: nextStreet,
-      event: "move",
-    })
+    pushHistory({ position: to, speedKmh: speed, street: nextStreet, event: "move" })
 
     if (s.soundEnabled) playBeep(s.soundVolume)
     evaluateGeofences(to)
@@ -355,6 +372,31 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   const moveOnce = useCallback(() => {
     performMove()
   }, [performMove])
+
+  // Place the beacon at an explicit position (user taps/clicks the map).
+  // Auto-movement then continues from this point.
+  const placeBeacon = useCallback(
+    (pos: LatLng) => {
+      // Snap walker to nearest street node so movement continues on-road
+      currentNodeRef.current    = nearestNode(pos)
+      arrivalBearingRef.current = 45 // reset heading to NE so first turn is unpredictable
+      stepCountRef.current += 1
+      const nextStreet = streetForIndex(stepCountRef.current)
+      setPosition(pos)
+      setSpeedKmh(0)
+      setStreet(nextStreet)
+      setMoving(false)
+      pushHistory({
+        position: pos,
+        speedKmh: 0,
+        street: nextStreet,
+        event: "manual",
+        note: "Маяк установлен вручную",
+      })
+      evaluateGeofences(pos)
+    },
+    [evaluateGeofences, pushHistory],
+  )
 
   // auto-move loop
   useEffect(() => {
@@ -429,6 +471,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
       street,
       moving,
       moveOnce,
+      placeBeacon,
       objects,
       history,
       clearHistory,
@@ -458,6 +501,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
       street,
       moving,
       moveOnce,
+      placeBeacon,
       objects,
       history,
       clearHistory,

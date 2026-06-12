@@ -22,10 +22,11 @@ function CtrlButton({
       aria-label={label}
       title={label}
       className={cn(
-        "grid size-10 place-items-center text-foreground transition-colors hover:bg-accent",
+        "grid size-10 place-items-center text-foreground transition-all hover:bg-accent active:scale-90",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active && "bg-primary text-primary-foreground hover:bg-primary",
+        active && "text-primary-foreground",
       )}
+      style={active ? { background: "var(--grad-primary)", boxShadow: "var(--glow-primary)" } : {}}
     >
       {children}
     </button>
@@ -36,16 +37,16 @@ export function MapControls() {
   const { zoom, setZoom, requestCenter, rotationMode, toggleRotationMode } = useStore()
 
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div className="flex animate-fade-in flex-col items-end gap-2">
       {/* rotation */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card/90 shadow-lg backdrop-blur">
+      <div className="glass overflow-hidden rounded-2xl">
         <CtrlButton
           onClick={toggleRotationMode}
           active={rotationMode === "movement"}
           label={
             rotationMode === "north"
-              ? "Поворот: на север (нажмите для следования за точкой)"
-              : "Поворот: по движению (нажмите для севера)"
+              ? "Поворот: на север"
+              : "Поворот: по движению"
           }
         >
           {rotationMode === "north" ? (
@@ -57,14 +58,14 @@ export function MapControls() {
       </div>
 
       {/* center on beacon */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card/90 shadow-lg backdrop-blur">
+      <div className="glass overflow-hidden rounded-2xl">
         <CtrlButton onClick={() => requestCenter()} label="Центрировать на маяке">
           <LocateFixed className="size-5 text-primary" />
         </CtrlButton>
       </div>
 
       {/* zoom */}
-      <div className="flex flex-col overflow-hidden rounded-xl border border-border bg-card/90 shadow-lg backdrop-blur">
+      <div className="glass flex flex-col overflow-hidden rounded-2xl">
         <CtrlButton onClick={() => setZoom((z) => z + 1)} label="Приблизить">
           <Plus className="size-5" />
         </CtrlButton>

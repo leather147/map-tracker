@@ -29,7 +29,7 @@ export function MapFallback() {
   const rotation = rotationMode === "movement" ? -heading : 0
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-muted">
+    <div className="absolute inset-0 overflow-hidden" style={{ background: "#0c0a12" }}>
       <div
         className="absolute left-1/2 top-1/2"
         style={{
@@ -41,8 +41,8 @@ export function MapFallback() {
       >
         <svg viewBox={`0 0 ${w} ${h}`} className="size-full" aria-label="Стилизованная карта Санкт-Петербурга">
           {/* water blocks */}
-          <rect x="0" y="0" width={w} height="180" className="fill-primary/10" />
-          <rect x="0" y="0" width="150" height={h} className="fill-primary/10" />
+          <rect x="0" y="0" width={w} height="180" fill="#171526" />
+          <rect x="0" y="0" width="150" height={h} fill="#171526" />
 
           {/* building blocks */}
           {layers.buildings &&
@@ -57,7 +57,8 @@ export function MapFallback() {
                   width={78}
                   height={70}
                   rx={6}
-                  className="fill-foreground/[0.06] stroke-border"
+                  fill="#15131f"
+                  stroke="#221d33"
                   strokeWidth={1}
                 />
               )
@@ -65,7 +66,7 @@ export function MapFallback() {
 
           {/* road grid */}
           {layers.roads && (
-            <g className="stroke-border" strokeWidth={6} fill="none">
+            <g stroke="#241f36" strokeWidth={6} fill="none">
               {Array.from({ length: 9 }).map((_, i) => (
                 <line key={`v${i}`} x1={110 + i * 110} y1={180} x2={110 + i * 110} y2={h} />
               ))}
@@ -114,10 +115,10 @@ export function MapFallback() {
           {/* labels */}
           {layers.labels && (
             <>
-              <text x="180" y="120" className="fill-muted-foreground" fontSize="22">
+              <text x="180" y="120" fill="#5b5570" fontSize="22">
                 р. Нева
               </text>
-              <text x="560" y="540" className="fill-muted-foreground" fontSize="20" transform="rotate(-26 560 540)">
+              <text x="560" y="540" fill="#5b5570" fontSize="20" transform="rotate(-26 560 540)">
                 Невский проспект
               </text>
             </>

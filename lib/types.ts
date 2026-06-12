@@ -16,7 +16,7 @@ export interface HistoryEntry {
   position: LatLng
   speedKmh: number
   street: string
-  event: "move" | "start" | "stop" | "geofence-enter" | "geofence-exit"
+  event: "move" | "start" | "stop" | "geofence-enter" | "geofence-exit" | "manual"
   note?: string
 }
 

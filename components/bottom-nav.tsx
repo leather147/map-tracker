@@ -17,8 +17,8 @@ export function BottomNav() {
   const { activePanel, setActivePanel } = useStore()
 
   return (
-    <nav className="pointer-events-auto rounded-2xl border border-border bg-card/95 p-1.5 shadow-xl backdrop-blur">
-      <ul className="flex items-stretch justify-between gap-1">
+    <nav className="glass pointer-events-auto rounded-3xl p-1.5 shadow-lg">
+      <ul className="flex items-stretch justify-between gap-0.5">
         {NAV_ITEMS.map((item) => {
           const active = activePanel === item.id
           const Icon = item.icon
@@ -28,15 +28,16 @@ export function BottomNav() {
                 type="button"
                 onClick={() => setActivePanel(active && item.id !== "map" ? "map" : item.id)}
                 aria-current={active ? "page" : undefined}
+                style={active ? { background: "var(--grad-primary)", boxShadow: "var(--glow-primary)" } : {}}
                 className={cn(
-                  "flex w-full flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors",
+                  "flex w-full flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium transition-all active:scale-90",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active
-                    ? "bg-primary/15 text-primary"
+                    ? "text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground",
                 )}
               >
-                <Icon className="size-5" />
+                <Icon className={cn("size-5 transition-transform", active && "scale-110")} />
                 {item.label}
               </button>
             </li>
