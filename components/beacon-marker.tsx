@@ -66,31 +66,22 @@ export function BeaconMarker({
       {showToast && (
         <div
           className={cn(
-            "pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap",
+            "pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap",
             toastLeaving ? "beacon-toast-out" : "beacon-toast-in",
           )}
           aria-live="polite"
           role="status"
         >
-      <div
-        className={cn(
-          "pointer-events-none absolute bottom-full left-1/2 mb-3 -translate-x-1/2 whitespace-nowrap",
-          toastLeaving ? "beacon-toast-out" : "beacon-toast-in",
-        )}
-        aria-live="polite"
-        role="status"
-      >
-        <div
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-xl"
-          style={{
-            background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-            boxShadow: "0 0 18px 4px rgba(124,58,237,0.55), 0 4px 16px rgba(0,0,0,0.35)",
-          }}
-        >
-          <TriangleAlert className="size-4 shrink-0" aria-hidden />
-          Точка переместилась
-        </div>
-      </div>
+          <div
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-xl"
+            style={{
+              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              boxShadow: "0 0 18px 4px rgba(124,58,237,0.55), 0 4px 16px rgba(0,0,0,0.35)",
+            }}
+          >
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
+            Точка переместилась
+          </div>
         </div>
       )}
 
@@ -117,7 +108,7 @@ export function BeaconMarker({
         />
       )}
 
-      {/* ---- Dot (counter-filtered + bounce on move) ---- */}
+      {/* ---- Dot (counter-filtered + bounce on move, float when idle) ---- */}
       <button
         key={moveKey}
         type="button"
@@ -126,7 +117,7 @@ export function BeaconMarker({
         className={cn(
           "pointer-events-auto relative grid size-5 cursor-pointer place-items-center rounded-full",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-beacon",
-          moving ? "beacon-moving" : "transition-transform",
+          moving ? "beacon-moving" : "beacon-float",
         )}
         style={{
           background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${color} 60%, white), ${color} 60%, color-mix(in srgb, ${color} 80%, black))`,
@@ -137,6 +128,7 @@ export function BeaconMarker({
             `0 0 36px 10px color-mix(in srgb, ${color} 30%, transparent)`,
           ].join(", "),
           filter: counterFilter,
+          willChange: "transform",
         }}
         aria-label="Маяк: показать информацию о передвижении"
         aria-expanded={open}
@@ -187,7 +179,7 @@ export function BeaconMarker({
             <Row
               icon={<BatteryMedium className="size-3.5 text-warm" />}
               label="Статус"
-              value={moving ? "В движении" : "На месте"}
+              value={moving ? "В движен��и" : "На месте"}
             />
           </div>
 

@@ -249,13 +249,26 @@
 
 /* ===== Beacon movement animation ===== */
 @keyframes beacon-move {
-  0%   { transform: translate(-50%, -50%) scale(1); }
-  25%  { transform: translate(-50%, -50%) scale(1.22) translateY(-3px); }
-  60%  { transform: translate(-50%, -50%) scale(0.93); }
-  100% { transform: translate(-50%, -50%) scale(1); }
+  0%   { transform: translate(-50%, -50%) scale(1)    translateY(0px); }
+  18%  { transform: translate(-50%, -50%) scale(1.18) translateY(-5px); }
+  42%  { transform: translate(-50%, -50%) scale(0.91) translateY(1px); }
+  65%  { transform: translate(-50%, -50%) scale(1.07) translateY(-2px); }
+  82%  { transform: translate(-50%, -50%) scale(0.97) translateY(0px); }
+  100% { transform: translate(-50%, -50%) scale(1)    translateY(0px); }
 }
 .beacon-moving {
-  animation: beacon-move 0.35s var(--ease-glass, cubic-bezier(0.22,1,0.36,1)) both;
+  animation: beacon-move 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform;
+}
+
+/* Idle float — very subtle up/down drift when not moving */
+@keyframes beacon-float {
+  0%,100% { transform: translate(-50%, -50%) translateY(0px) scale(1); }
+  50%      { transform: translate(-50%, -50%) translateY(-2.5px) scale(1.015); }
+}
+.beacon-float {
+  animation: beacon-float 3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
 }
 
 /* ===== Beacon toast (movement notification) ===== */
@@ -346,22 +359,25 @@
     transform: scale(1);
     opacity: var(--beacon-pulse-opacity, 0.55);
   }
-  70% {
-    transform: scale(var(--beacon-pulse-scale, 3));
-    opacity: 0;
+  60% {
+    opacity: 0.12;
   }
   100% {
-    transform: scale(var(--beacon-pulse-scale, 3));
+    transform: scale(var(--beacon-pulse-scale, 3.2));
     opacity: 0;
   }
 }
 
 .beacon-ring {
-  animation: beacon-pulse var(--beacon-pulse-duration, 1.8s) ease-out infinite;
+  animation: beacon-pulse var(--beacon-pulse-duration, 2s) cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
+  will-change: transform, opacity;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .beacon-ring {
+  .beacon-ring,
+  .beacon-moving,
+  .beacon-float {
     animation: none;
+    will-change: auto;
   }
 }
