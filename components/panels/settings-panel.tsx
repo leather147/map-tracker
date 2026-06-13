@@ -16,6 +16,15 @@ import {
   type MovementSoundKind,
 } from "@/lib/sound"
 import type { BeaconSettings, Direction } from "@/lib/types"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { playBeep } from "@/lib/sound"
+import { getSliderNumber } from "@/lib/slider-value"
+import type { Direction } from "@/lib/types"
 
 const DIRECTIONS: { value: Direction; label: string }[] = [
   { value: "N", label: "Север ↑" },
@@ -134,7 +143,7 @@ function IntervalRow({ value, onChange, disabled }: { value: number; onChange: (
         step={100}
         disabled={disabled}
         onValueChange={(next) => onChange(getSliderNumber(next))}
-        aria-label="Интервал обновления"
+        aria-label="Интервал обновления (грубая настройка)"
       />
       <div className="flex justify-between text-[10px] text-muted-foreground">
         <span>100 мс</span><span className="tabular-nums">{label}</span><span>10 с+</span>

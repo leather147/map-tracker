@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { getSliderNumber } from "@/lib/slider-value"
 import type { Direction, Scenario } from "@/lib/types"
 
 const DIRECTIONS: { value: Direction; label: string }[] = [
@@ -199,11 +200,13 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
                   <span className="tabular-nums font-medium text-foreground">{formatDelay(step.delayMs)}</span>
                 </div>
                 <Slider
-                  value={[step.delayMs]}
+                  value={step.delayMs}
                   min={100}
                   max={60000}
                   step={100}
-                  onValueChange={(vals) => updateScenarioStep(scenario.id, step.id, { delayMs: (vals as number[])[0] })}
+                  onValueChange={(next) =>
+                    updateScenarioStep(scenario.id, step.id, { delayMs: getSliderNumber(next) })
+                  }
                   aria-label="Задержка шага"
                 />
               </div>
@@ -217,11 +220,13 @@ function ScenarioCard({ scenario }: { scenario: Scenario }) {
                   </span>
                 </div>
                 <Slider
-                  value={[step.stepMeters]}
+                  value={step.stepMeters}
                   min={0}
                   max={500}
                   step={5}
-                  onValueChange={(vals) => updateScenarioStep(scenario.id, step.id, { stepMeters: (vals as number[])[0] })}
+                  onValueChange={(next) =>
+                    updateScenarioStep(scenario.id, step.id, { stepMeters: getSliderNumber(next) })
+                  }
                   aria-label="Расстояние шага"
                 />
               </div>
