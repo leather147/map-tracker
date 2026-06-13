@@ -8,6 +8,8 @@ export type RotationMode = "north" | "movement"
 
 export type Direction = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW"
 
+export type MovementSoundKind = "beep" | "soft" | "radar" | "alarm" | "radio"
+
 export type PanelId = "map" | "objects" | "history" | "geofences" | "settings"
 
 export interface HistoryEntry {
@@ -85,6 +87,8 @@ export interface BeaconSettings {
   // sound
   soundEnabled: boolean
   soundVolume: number
+  movementSoundKind: MovementSoundKind
+  movementSoundDurationMs: number
   // map
   mapHue: number  // hue-rotate degrees for dark map filter (0–360)
   // beacon appearance
