@@ -173,7 +173,37 @@ export function YandexMap() {
     }
   }, [layers.traffic, status])
 
-  // ── External zoom buttons ──────────────────────────────────────────────────
+  // ── Labels layer — hide/show map text via injected style ──────────────────
+  // Yandex Maps 2.1 renders labels as a separate tile layer in its own pane.
+  // We use version-agnostic attribute selectors so the rule survives SDK
+  // patch updates that change the minor version in class names.
+  useEffect(() => {
+    const id = "ymaps-labels-override"
+    let el = document.getElementById(id) as HTMLStyleElement | null
+
+    if (!layers.labels) {
+      if (!el) {
+        el = document.createElement("style")
+        el.id = id
+        document.head.appendChild(el)
+      }
+      el.textContent = `
+        /* Version-agnostic: target any Yandex pane that carries place labels */
+        [class*="ymaps"][class*="places-pane"],
+        [class*="ymaps"][class*="places-pane"] *,
+        [class*="ymaps"][class*="labels"],
+        [class*="ymaps"][class*="labels"] * {
+          opacity: 0 !important;
+          pointer-events: none !important;
+        }
+      `
+    } else {
+      el?.remove()
+    }
+    return () => {
+      if (layers.labels) document.getElementById("ymaps-labels-override")?.remove()
+    }
+  }, [layers.labels])
   useEffect(() => {
     const map = mapRef.current
     if (!map) return

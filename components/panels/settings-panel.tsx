@@ -2,6 +2,7 @@
 
 import { useStore } from "@/lib/store"
 import { PanelHeader } from "@/components/panels/panel-header"
+import { ScenarioEditor } from "@/components/panels/scenario-editor"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
@@ -99,9 +100,60 @@ function SliderRow({
         max={max}
         step={step}
         disabled={disabled}
-        onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
+        onValueChange={(vals) => onChange((vals as number[])[0])}
         aria-label={label}
       />
+    </div>
+  )
+}
+
+/** Precise interval input: slider for coarse + numeric text input for exact ms value */
+function IntervalRow({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number
+  onChange: (v: number) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className={disabled ? "space-y-2 opacity-40 pointer-events-none" : "space-y-2"}>
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="font-medium">Интервал обновления</span>
+        <div className="flex items-center gap-1">
+          <input
+            type="number"
+            min={100}
+            max={3_600_000}
+            step={100}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              if (!isNaN(v) && v >= 100 && v <= 3_600_000) onChange(v)
+            }}
+            className="h-7 w-24 rounded-md border border-border bg-background px-2 text-right font-mono text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+            aria-label="Интервал в миллисекундах"
+          />
+          <span className="text-xs text-muted-foreground">мс</span>
+        </div>
+      </div>
+      {/* coarse slider: 100 ms – 10 s logarithmic feel via step 100 */}
+      <Slider
+        value={[Math.min(value, 10_000)]}
+        min={100}
+        max={10_000}
+        step={100}
+        disabled={disabled}
+        onValueChange={(vals) => onChange((vals as number[])[0])}
+        aria-label="Интервал обновления (грубая настройка)"
+      />
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>100 мс</span>
+        <span className="tabular-nums">{value >= 60_000 ? `${(value / 60_000).toFixed(1)} мин` : value >= 1_000 ? `${(value / 1_000).toFixed(2)} с` : `${value} мс`}</span>
+        <span>10 с+</span>
+      </div>
     </div>
   )
 }
@@ -113,7 +165,6 @@ export function SettingsPanel() {
     <div className="flex h-full flex-col">
       <PanelHeader title="Настройки" subtitle="Параметры маяка и приложения" />
 
-      {/* ScrollArea fills remaining height — content is fully scrollable */}
       <ScrollArea className="flex-1 overflow-hidden">
         <div className="space-y-6 px-4 py-5 pb-8">
 
@@ -139,8 +190,6 @@ export function SettingsPanel() {
               onChange={(v) => updateSettings({ visible: v })}
             />
             <Divider />
-
-            {/* Beacon color picker */}
             <div className="flex items-center justify-between gap-4 py-0.5">
               <span>
                 <span className="block text-sm font-medium leading-snug">Цвет маяка</span>
@@ -167,7 +216,6 @@ export function SettingsPanel() {
               </label>
             </div>
             <Divider />
-
             <ToggleRow
               label="Тёмная тема"
               desc="Синяя карта, тёмный интерфейс"
@@ -217,14 +265,10 @@ export function SettingsPanel() {
               onChange={(v) => updateSettings({ autoMove: v })}
             />
             <Divider />
-            <SliderRow
-              label="Тайминг обновления"
+            <IntervalRow
               value={settings.intervalMs}
-              display={`${(settings.intervalMs / 1000).toFixed(1)} с`}
-              min={500}
-              max={10000}
-              step={250}
               onChange={(v) => updateSettings({ intervalMs: v })}
+              disabled={!settings.autoMove || settings.scenarioEnabled}
             />
             <Divider />
             <ToggleRow
@@ -262,6 +306,14 @@ export function SettingsPanel() {
               disabled={settings.followRoute}
               onChange={(v) => updateSettings({ stepMeters: v })}
             />
+          </Section>
+
+          {/* ── Сценарии ── */}
+          <Section title="Сценарии движения">
+            <p className="text-xs text-muted-foreground">
+              Сценарий — это последовательность шагов с индивидуальной задержкой и расстоянием. При запуске сценария автодвижение отключается.
+            </p>
+            <ScenarioEditor />
           </Section>
 
           {/* ── Расписание ── */}
