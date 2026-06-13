@@ -13,13 +13,22 @@ function Slider(props: SliderPrimitive.Root.Props) {
           : [min]
 
   return (
-    <SliderPrimitive.Root {...props} className={className} min={min} thumbAlignment="edge">
-      <SliderPrimitive.Control>
-        <SliderPrimitive.Track>
-          <SliderPrimitive.Indicator />
+    <SliderPrimitive.Root
+      {...props}
+      className={["data-horizontal:w-full data-vertical:h-full", className].filter(Boolean).join(" ")}
+      min={min}
+      thumbAlignment="edge"
+    >
+      <SliderPrimitive.Control className="relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col">
+        <SliderPrimitive.Track className="relative grow overflow-hidden rounded-full bg-muted select-none data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1">
+          <SliderPrimitive.Indicator className="bg-primary select-none data-horizontal:h-full data-vertical:w-full" />
         </SliderPrimitive.Track>
         {values.map((_, index) => (
-          <SliderPrimitive.Thumb key={index} index={index} />
+          <SliderPrimitive.Thumb
+            key={index}
+            index={index}
+            className="relative block size-3 shrink-0 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none hover:ring-3 focus-visible:ring-3 active:ring-3 disabled:opacity-50"
+          />
         ))}
       </SliderPrimitive.Control>
     </SliderPrimitive.Root>
