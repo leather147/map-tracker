@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useStore } from "@/lib/store"
 import { PanelHeader } from "@/components/panels/panel-header"
 import { ScenarioEditor } from "@/components/panels/scenario-editor"
@@ -14,9 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { playBeep } from "@/lib/sound"
+import {
+  MOVEMENT_SOUND_PRESETS,
+  playMovementSound,
+  setMovementSoundOptions,
+  type MovementSoundKind,
+} from "@/lib/sound"
 import { getSliderNumber } from "@/lib/slider-value"
-import type { Direction } from "@/lib/types"
+import type { BeaconSettings, Direction } from "@/lib/types"
 
 const DIRECTIONS: { value: Direction; label: string }[] = [
   { value: "N",  label: "Север ↑" },
@@ -161,6 +167,22 @@ function IntervalRow({
 
 export function SettingsPanel() {
   const { settings, updateSettings, theme, toggleTheme, zoom, setZoom } = useStore()
+  const soundSettings = settings as BeaconSettings & {
+    movementSoundKind?: MovementSoundKind
+    movementSoundDurationMs?: number
+  }
+  const movementSoundKind = soundSettings.movementSoundKind ?? "beep"
+  const movementSoundDurationMs = soundSettings.movementSoundDurationMs ?? 120
+  const updateMovementSoundSettings = (
+    patch: Partial<{ movementSoundKind: MovementSoundKind; movementSoundDurationMs: number }>,
+  ) => updateSettings(patch as Partial<BeaconSettings>)
+
+  useEffect(() => {
+    setMovementSoundOptions({
+      kind: movementSoundKind,
+      durationMs: movementSoundDurationMs,
+    })
+  }, [movementSoundKind, movementSoundDurationMs])
 
   return (
     <div className="flex h-full flex-col">
@@ -373,14 +395,43 @@ export function SettingsPanel() {
           <Section title="Звук">
             <ToggleRow
               label="Звуковой сигнал"
-              desc="Бип при каждом перемещении"
+              desc="Сигнал при каждом перемещении"
               checked={settings.soundEnabled}
               onChange={(v) => {
                 updateSettings({ soundEnabled: v })
-                if (v) playBeep(settings.soundVolume)
+                if (v) playMovementSound(settings.soundVolume, movementSoundKind, movementSoundDurationMs)
               }}
             />
             <Divider />
+            <div className={settings.soundEnabled ? "space-y-2" : "space-y-2 opacity-40 pointer-events-none"}>
+              <span className="text-sm font-medium">Тип сигнала</span>
+              <Select
+                value={movementSoundKind}
+                onValueChange={(v) => updateMovementSoundSettings({ movementSoundKind: v as MovementSoundKind })}
+                disabled={!settings.soundEnabled}
+              >
+                <SelectTrigger className="w-full" aria-label="Тип звукового сигнала">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MOVEMENT_SOUND_PRESETS.map((preset) => (
+                    <SelectItem key={preset.value} value={preset.value}>
+                      {preset.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <SliderRow
+              label="Длина сигнала"
+              value={movementSoundDurationMs}
+              display={`${(movementSoundDurationMs / 1000).toFixed(2)} с`}
+              min={120}
+              max={3000}
+              step={120}
+              disabled={!settings.soundEnabled}
+              onChange={(v) => updateMovementSoundSettings({ movementSoundDurationMs: v })}
+            />
             <SliderRow
               label="Громкость"
               value={Math.round(settings.soundVolume * 100)}
@@ -394,7 +445,7 @@ export function SettingsPanel() {
             <button
               type="button"
               disabled={!settings.soundEnabled}
-              onClick={() => playBeep(settings.soundVolume)}
+              onClick={() => playMovementSound(settings.soundVolume, movementSoundKind, movementSoundDurationMs)}
               className="w-full rounded-lg border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-40"
             >
               Проверить сигнал
