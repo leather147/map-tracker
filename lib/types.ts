@@ -41,16 +41,43 @@ export interface TrackedObject {
   street: string
 }
 
+// ─── Scenario types ───────────────────────────────────────────────────────────
+
+/** A single step in a movement scenario */
+export interface ScenarioStep {
+  id: string
+  /** Pause before this step fires (ms) */
+  delayMs: number
+  /** How many meters to move in this step */
+  stepMeters: number
+  /** Optional fixed direction; null = follow street graph */
+  direction: Direction | null
+}
+
+/** A named sequence of steps that replace auto-move when active */
+export interface Scenario {
+  id: string
+  name: string
+  /** Loop scenario after last step */
+  loop: boolean
+  steps: ScenarioStep[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface BeaconSettings {
   visible: boolean
   // movement
   autoMove: boolean
-  intervalMs: number // how often it moves
+  intervalMs: number // how often it moves (ms) — high-precision, 100–60000
   stepMeters: number // distance per move
   direction: Direction
   followRoute: boolean
   scheduledMove: boolean
   scheduleAt: string // HH:MM
+  // scenario
+  scenarioEnabled: boolean
+  activeScenarioId: string | null
   // pulse
   pulseEnabled: boolean
   pulseDurationMs: number

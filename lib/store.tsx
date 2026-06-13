@@ -17,6 +17,8 @@ import type {
   MapLayer,
   PanelId,
   RotationMode,
+  Scenario,
+  ScenarioStep,
   ThemeMode,
   TrackedObject,
 } from "@/lib/types"
@@ -62,6 +64,8 @@ const DEFAULT_SETTINGS: BeaconSettings = {
   followRoute: true,
   scheduledMove: false,
   scheduleAt: "12:00",
+  scenarioEnabled: false,
+  activeScenarioId: null,
   pulseEnabled: true,
   pulseDurationMs: 1800,
   pulseScale: 3,
@@ -71,6 +75,44 @@ const DEFAULT_SETTINGS: BeaconSettings = {
   beaconColor: "#ef4444",
   panelWidth: 340,
 }
+
+const DEFAULT_SCENARIOS: Scenario[] = [
+  {
+    id: "sc-patrol",
+    name: "Патруль",
+    loop: true,
+    steps: [
+      { id: uid(), delayMs: 1000, stepMeters: 20, direction: null },
+      { id: uid(), delayMs: 1000, stepMeters: 20, direction: null },
+      { id: uid(), delayMs: 3000, stepMeters: 5,  direction: null },
+      { id: uid(), delayMs: 1000, stepMeters: 20, direction: null },
+      { id: uid(), delayMs: 5000, stepMeters: 0,  direction: null },
+    ],
+  },
+  {
+    id: "sc-fast",
+    name: "Быстрое движение",
+    loop: true,
+    steps: [
+      { id: uid(), delayMs: 500,  stepMeters: 60, direction: null },
+      { id: uid(), delayMs: 500,  stepMeters: 60, direction: null },
+      { id: uid(), delayMs: 500,  stepMeters: 60, direction: null },
+      { id: uid(), delayMs: 500,  stepMeters: 60, direction: null },
+      { id: uid(), delayMs: 2000, stepMeters: 10, direction: null },
+    ],
+  },
+  {
+    id: "sc-stop-go",
+    name: "Стой-иди",
+    loop: true,
+    steps: [
+      { id: uid(), delayMs: 2000, stepMeters: 30, direction: null },
+      { id: uid(), delayMs: 8000, stepMeters: 0,  direction: null },
+      { id: uid(), delayMs: 2000, stepMeters: 30, direction: null },
+      { id: uid(), delayMs: 8000, stepMeters: 0,  direction: null },
+    ],
+  },
+]
 
 const INITIAL_OBJECTS: TrackedObject[] = [
   {
@@ -167,6 +209,15 @@ interface StoreValue {
   removeGeofence: (id: string) => void
 
   insideGeofenceIds: string[]
+
+  // scenarios
+  scenarios: Scenario[]
+  addScenario: () => void
+  updateScenario: (id: string, patch: Partial<Omit<Scenario, "id" | "steps">>) => void
+  removeScenario: (id: string) => void
+  addScenarioStep: (scenarioId: string) => void
+  updateScenarioStep: (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => void
+  removeScenarioStep: (scenarioId: string, stepId: string) => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -214,6 +265,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   ])
   const [geofences, setGeofences] = useState<Geofence[]>(INITIAL_GEOFENCES)
   const [insideGeofenceIds, setInsideGeofenceIds] = useState<string[]>([])
+  const [scenarios, setScenarios] = useState<Scenario[]>(DEFAULT_SCENARIOS)
 
   // refs for the movement engine (avoid stale closures / re-subscribing)
   const stepCountRef    = useRef(0)
@@ -424,6 +476,153 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
     return () => window.clearInterval(id)
   }, [settings.scheduledMove, settings.visible, settings.scheduleAt, performMove])
 
+  // scenario runner — plays steps in order, respecting per-step delayMs
+  const scenarioStepRef = useRef(0)
+  const scenarioTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (!settings.scenarioEnabled || !settings.activeScenarioId || !settings.visible) {
+      if (scenarioTimerRef.current) clearTimeout(scenarioTimerRef.current)
+      return
+    }
+    const scenario = scenarios.find((s) => s.id === settings.activeScenarioId)
+    if (!scenario || scenario.steps.length === 0) return
+
+    let cancelled = false
+
+    function scheduleNext(stepIdx: number) {
+      if (cancelled) return
+      const step = scenario!.steps[stepIdx]
+      if (!step) return
+
+      scenarioTimerRef.current = setTimeout(() => {
+        if (cancelled) return
+        // Only move if stepMeters > 0
+        if (step.stepMeters > 0) {
+          // temporarily override stepMeters + direction for this one move
+          const s = settingsRef.current
+          const from = positionRef.current
+          let heading: number
+          let to: LatLng
+
+          if (step.direction) {
+            heading = bearingFromDirection(step.direction)
+            to = moveByDistance(from, step.stepMeters, heading)
+            currentNodeRef.current = nearestNode(to)
+            arrivalBearingRef.current = heading
+          } else if (s.followRoute) {
+            const node = currentNodeRef.current
+            const distToNode = distanceMeters(from, node.pos)
+            if (distToNode <= step.stepMeters) {
+              const { node: nextNode, exitBearing } = pickNextNode(node, arrivalBearingRef.current)
+              currentNodeRef.current = nextNode
+              arrivalBearingRef.current = exitBearing
+              heading = exitBearing
+              to = moveByDistance(node.pos, step.stepMeters, heading)
+            } else {
+              heading = calcBearing(from, node.pos)
+              to = moveByDistance(from, step.stepMeters, heading)
+            }
+          } else {
+            heading = bearingFromDirection(s.direction)
+            to = moveByDistance(from, step.stepMeters, heading)
+          }
+
+          const dist = distanceMeters(from, to)
+          const speed = Math.round((dist / (step.delayMs / 1000)) * 3.6)
+          stepCountRef.current += 1
+          const nextStreet = streetForIndex(stepCountRef.current)
+
+          setPosition(to)
+          setSpeedKmh(speed)
+          setStreet(nextStreet)
+          setMoving(true)
+          setHeading(heading)
+          pushHistory({ position: to, speedKmh: speed, street: nextStreet, event: "move" })
+          if (s.soundEnabled) playBeep(s.soundVolume)
+          evaluateGeofences(to)
+          window.setTimeout(() => setMoving(false), Math.min(900, step.delayMs - 50))
+        }
+
+        const nextIdx = stepIdx + 1
+        if (nextIdx < scenario!.steps.length) {
+          scheduleNext(nextIdx)
+        } else if (scenario!.loop) {
+          scheduleNext(0)
+        }
+      }, step.delayMs)
+    }
+
+    scenarioStepRef.current = 0
+    scheduleNext(0)
+
+    return () => {
+      cancelled = true
+      if (scenarioTimerRef.current) clearTimeout(scenarioTimerRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.scenarioEnabled, settings.activeScenarioId, settings.visible, scenarios, evaluateGeofences, pushHistory])
+
+  // scenario CRUD
+  const addScenario = useCallback(() => {
+    setScenarios((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        name: `Сценарий ${prev.length + 1}`,
+        loop: true,
+        steps: [{ id: uid(), delayMs: 2000, stepMeters: 20, direction: null }],
+      },
+    ])
+  }, [])
+
+  const updateScenario = useCallback(
+    (id: string, patch: Partial<Omit<Scenario, "id" | "steps">>) => {
+      setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+    },
+    [],
+  )
+
+  const removeScenario = useCallback((id: string) => {
+    setScenarios((prev) => prev.filter((s) => s.id !== id))
+    setSettings((prev) =>
+      prev.activeScenarioId === id
+        ? { ...prev, activeScenarioId: null, scenarioEnabled: false }
+        : prev,
+    )
+  }, [])
+
+  const addScenarioStep = useCallback((scenarioId: string) => {
+    setScenarios((prev) =>
+      prev.map((s) =>
+        s.id === scenarioId
+          ? { ...s, steps: [...s.steps, { id: uid(), delayMs: 2000, stepMeters: 20, direction: null }] }
+          : s,
+      ),
+    )
+  }, [])
+
+  const updateScenarioStep = useCallback(
+    (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => {
+      setScenarios((prev) =>
+        prev.map((s) =>
+          s.id === scenarioId
+            ? { ...s, steps: s.steps.map((st) => (st.id === stepId ? { ...st, ...patch } : st)) }
+            : s,
+        ),
+      )
+    },
+    [],
+  )
+
+  const removeScenarioStep = useCallback((scenarioId: string, stepId: string) => {
+    setScenarios((prev) =>
+      prev.map((s) =>
+        s.id === scenarioId ? { ...s, steps: s.steps.filter((st) => st.id !== stepId) } : s,
+      ),
+    )
+  }, [])
+
   const clearHistory = useCallback(() => {
     setHistory([])
     insideRef.current = []
@@ -485,6 +684,13 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
       updateGeofence,
       removeGeofence,
       insideGeofenceIds,
+      scenarios,
+      addScenario,
+      updateScenario,
+      removeScenario,
+      addScenarioStep,
+      updateScenarioStep,
+      removeScenarioStep,
     }),
     [
       theme,
@@ -515,6 +721,13 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
       updateGeofence,
       removeGeofence,
       insideGeofenceIds,
+      scenarios,
+      addScenario,
+      updateScenario,
+      removeScenario,
+      addScenarioStep,
+      updateScenarioStep,
+      removeScenarioStep,
     ],
   )
 
