@@ -14,7 +14,8 @@ import { PanelContent } from "@/components/panel-content"
 import { cn } from "@/lib/utils"
 
 export function AppShell() {
-  const { activePanel } = useStore()
+  const { activePanel, settings } = useStore()
+  const panelWidth = settings.panelWidth ?? 340
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -37,11 +38,15 @@ export function AppShell() {
           className={cn(
             "pointer-events-auto h-full shrink-0 overflow-hidden",
             "transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-            collapsed ? "w-0" : "w-[340px]",
+            collapsed ? "w-0" : `w-[${panelWidth}px]`,
           )}
+          style={collapsed ? {} : { width: panelWidth }}
         >
           {/* inner div keeps fixed width so content never wraps during transition */}
-          <div className="glass-strong h-full w-[340px] border-y-0 border-l-0 animate-fade-in">
+          <div
+            className="glass-strong h-full overflow-hidden border-y-0 border-l-0 rounded-r-xl animate-fade-in"
+            style={{ width: panelWidth }}
+          >
             <PanelContent />
           </div>
         </div>
@@ -54,8 +59,8 @@ export function AppShell() {
             aria-label={collapsed ? "Развернуть панель" : "Свернуть панель"}
             title={collapsed ? "Развернуть панель" : "Свернуть панель"}
             className={cn(
-              "glass pointer-events-auto flex h-16 w-5 items-center justify-center",
-              "rounded-r-3xl border-l-0",
+              "glass pointer-events-auto flex h-14 w-5 items-center justify-center",
+              "rounded-r-xl border-l-0",
               "transition-all duration-200 hover:bg-primary/10 active:scale-95",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             )}
@@ -114,7 +119,7 @@ export function AppShell() {
 
         {/* bottom sheet panel */}
         {activePanel !== "map" ? (
-          <div className="glass-strong pointer-events-auto absolute inset-x-0 bottom-[84px] mx-2 max-h-[55dvh] animate-sheet-up overflow-hidden rounded-3xl">
+          <div className="glass-strong pointer-events-auto absolute inset-x-0 bottom-[84px] mx-2 max-h-[55dvh] animate-sheet-up overflow-hidden rounded-xl">
             <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-border/60" />
             <div className="h-[52dvh]">
               <PanelContent />
@@ -137,9 +142,9 @@ function MobileMapStrip() {
   const { settings, speedKmh, street, moving, moveOnce } = useStore()
   if (!settings.visible) return null
   return (
-    <div className="glass pointer-events-auto absolute inset-x-0 bottom-[84px] mx-2 flex animate-sheet-up items-center gap-3 rounded-3xl px-3 py-2.5">
+    <div className="glass pointer-events-auto absolute inset-x-0 bottom-[84px] mx-2 flex animate-sheet-up items-center gap-3 rounded-xl px-3 py-2.5">
       <span
-        className="grid size-9 shrink-0 place-items-center rounded-2xl"
+        className="grid size-9 shrink-0 place-items-center rounded-lg"
         style={{ background: "var(--grad-primary)", boxShadow: "var(--glow-beacon)" }}
       >
         <span className="size-2.5 rounded-full bg-white/90" />
@@ -155,7 +160,7 @@ function MobileMapStrip() {
       <button
         type="button"
         onClick={moveOnce}
-        className="btn-gradient shrink-0 rounded-2xl px-3 py-2 text-xs font-medium transition-all active:scale-90"
+        className="btn-gradient shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-all active:scale-90"
       >
         Сместить
       </button>

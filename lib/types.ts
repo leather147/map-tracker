@@ -58,4 +58,10 @@ export interface BeaconSettings {
   // sound
   soundEnabled: boolean
   soundVolume: number
+  // map
+  mapHue: number  // hue-rotate degrees for dark map filter (0–360)
+  // beacon appearance
+  beaconColor: string  // CSS color string, e.g. "#ef4444"
+  // ui
+  panelWidth: number   // desktop left panel width in px (240–520)
 }

@@ -19,15 +19,15 @@ function MapPanelSkeleton() {
         <Sk className="h-6 w-20 rounded-full" />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Sk className="h-[58px] rounded-2xl" />
-        <Sk className="h-[58px] rounded-2xl" />
-        <Sk className="col-span-2 h-[58px] rounded-2xl" />
-        <Sk className="col-span-2 h-[58px] rounded-2xl" />
+        <Sk className="h-[58px] rounded-lg" />
+        <Sk className="h-[58px] rounded-lg" />
+        <Sk className="col-span-2 h-[58px] rounded-lg" />
+        <Sk className="col-span-2 h-[58px] rounded-lg" />
       </div>
-      <Sk className="h-10 w-full rounded-2xl" />
+      <Sk className="h-10 w-full rounded-lg" />
       <div className="grid grid-cols-2 gap-2">
-        <Sk className="h-10 rounded-2xl" />
-        <Sk className="h-10 rounded-2xl" />
+        <Sk className="h-10 rounded-lg" />
+        <Sk className="h-10 rounded-lg" />
       </div>
     </div>
   )
@@ -120,7 +120,7 @@ export function MapPanel() {
             </div>
 
             {insideNames.length > 0 && (
-              <div className="rounded-2xl border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-primary">
                 Внутри геозон: {insideNames.join(", ")}
               </div>
             )}
@@ -130,7 +130,7 @@ export function MapPanel() {
               <button
                 type="button"
                 onClick={moveOnce}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-medium text-primary-foreground transition-all active:scale-[0.97]"
+                className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-primary-foreground transition-all active:scale-[0.97]"
                 style={{
                   background: "var(--grad-primary)",
                   boxShadow: "var(--glow-primary)",
@@ -143,7 +143,7 @@ export function MapPanel() {
                 <button
                   type="button"
                   onClick={() => requestCenter()}
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+                  className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
                 >
                   <Crosshair className="size-4 text-primary" />
                   Центр
@@ -151,7 +151,7 @@ export function MapPanel() {
                 <button
                   type="button"
                   onClick={() => updateSettings({ visible: !settings.visible })}
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-card px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+                  className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
                 >
                   {settings.visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   {settings.visible ? "Скрыть" : "Показать"}
@@ -177,7 +177,7 @@ function Stat({
   full?: boolean
 }) {
   return (
-    <div className={cn("rounded-2xl border border-border bg-card p-3", full && "col-span-2")}>
+    <div className={cn("rounded-lg border border-border bg-card p-3", full && "col-span-2")}>
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         {icon}
         {label}

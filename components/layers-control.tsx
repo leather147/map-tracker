@@ -27,7 +27,7 @@ export function LayersControl() {
         aria-label="Слои карты"
         aria-expanded={open}
         className={cn(
-          "glass grid size-10 place-items-center rounded-2xl text-foreground transition-all hover:bg-accent active:scale-90",
+          "glass grid size-10 place-items-center rounded-lg text-foreground transition-all hover:bg-accent active:scale-90",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           open && "text-primary-foreground",
         )}
@@ -42,7 +42,7 @@ export function LayersControl() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
-          <div className="glass-strong absolute right-0 top-12 z-40 w-52 origin-top-right animate-panel-in rounded-3xl p-1.5 text-popover-foreground">
+          <div className="glass-strong absolute right-0 top-12 z-40 w-52 origin-top-right animate-panel-in rounded-xl p-1.5 text-popover-foreground">
             <p className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Слои карты</p>
             {LAYER_META.map((l) => {
               const on = layers[l.id]
@@ -51,7 +51,7 @@ export function LayersControl() {
                   key={l.id}
                   type="button"
                   onClick={() => toggleLayer(l.id)}
-                  className="flex w-full items-center justify-between gap-2 rounded-2xl px-2 py-2 text-sm transition-colors hover:bg-accent active:scale-[0.98]"
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-accent active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-2.5">
                     <span className={cn("text-muted-foreground", on && "text-primary")}>{l.icon}</span>

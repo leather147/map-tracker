@@ -78,7 +78,7 @@
   --chart-3: oklch(0.6 0.2 30);
   --chart-4: oklch(0.55 0.12 320);
   --chart-5: oklch(0.65 0.1 260);
-  --radius: 0.9rem;
+  --radius: 0.55rem;
   --beacon: oklch(0.58 0.24 27);
   --beacon-foreground: oklch(0.98 0.01 27);
   --warm: oklch(0.78 0.16 75);
@@ -99,6 +99,7 @@
   --glow-primary: 0 0 20px -4px oklch(0.5 0.18 295 / 0.4), 0 0 40px -12px oklch(0.5 0.18 295 / 0.2);
   --glow-beacon:  0 0 16px -3px oklch(0.58 0.24 27 / 0.55), 0 0 32px -10px oklch(0.58 0.24 27 / 0.3);
   --glow-warm:    0 0 18px -4px oklch(0.78 0.16 75 / 0.45);
+}
 
 /* Dark theme: deep violet like Yandex Maps dark, warm amber accent, red beacon */
 .dark {
@@ -238,11 +239,51 @@
    Applied only to the map container div when theme === "dark" AND the real
    Yandex v2.1 tiles are loaded. Inverts the light base map to dark. */
 .map-dark-filter {
-  filter: invert(90%) hue-rotate(180deg);
-  transition: filter 0.5s var(--ease-glass, ease);
+  /* --map-hue is set by the store (default 40deg).
+     invert(92%) flips the light Yandex tiles to dark; hue-rotate shifts
+     the resulting green-teal palette. 40deg = blue/violet (opposite to
+     the natural 220deg green side). Adjustable in Settings → Карта. */
+  filter: invert(92%) hue-rotate(var(--map-hue, 40deg)) saturate(1.3) brightness(0.88);
+  transition: filter 0.4s ease;
 }
 
-/* ===== Smooth entrance animations ===== */
+/* ===== Beacon movement animation ===== */
+@keyframes beacon-move {
+  0%   { transform: translate(-50%, -50%) scale(1); }
+  25%  { transform: translate(-50%, -50%) scale(1.22) translateY(-3px); }
+  60%  { transform: translate(-50%, -50%) scale(0.93); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+.beacon-moving {
+  animation: beacon-move 0.35s var(--ease-glass, cubic-bezier(0.22,1,0.36,1)) both;
+}
+
+/* ===== Beacon toast (movement notification) ===== */
+@keyframes badge-in {
+  0%   { opacity: 0; transform: translateY(-12px) scale(0.85); }
+  60%  { opacity: 1; transform: translateY(2px) scale(1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes badge-out {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.9); }
+}
+.beacon-toast-in  { animation: badge-in  0.36s var(--ease-glass, ease) both; }
+.beacon-toast-out { animation: badge-out 0.28s var(--ease-glass, ease) both; }
+
+/* ===== Counter-filter for beacon dot =====
+   The dot sits inside .map-dark-filter which applies invert+hue-rotate.
+   We undo exactly that transform so the dot always shows its real color. */
+.beacon-counter-filter {
+  /* first invert back (1/0.92 ≈ 1.087 ≈ 100% is close enough; double invert is identity),
+     then rotate hue in the opposite direction. */
+  filter: invert(100%) hue-rotate(calc(180deg - var(--map-hue, 40deg)));
+  /* when not inside a map filter, the double invert is transparent — keep it */
+}
+/* Outside map filter (light mode / no filter parent): just be transparent to avoid invert */
+.no-map-filter .beacon-counter-filter {
+  filter: none;
+}
 @keyframes panel-in {
   from {
     opacity: 0;

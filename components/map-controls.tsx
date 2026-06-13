@@ -39,7 +39,7 @@ export function MapControls() {
   return (
     <div className="flex animate-fade-in flex-col items-end gap-2">
       {/* rotation */}
-      <div className="glass overflow-hidden rounded-2xl">
+      <div className="glass overflow-hidden rounded-lg">
         <CtrlButton
           onClick={toggleRotationMode}
           active={rotationMode === "movement"}
@@ -58,14 +58,14 @@ export function MapControls() {
       </div>
 
       {/* center on beacon */}
-      <div className="glass overflow-hidden rounded-2xl">
+      <div className="glass overflow-hidden rounded-lg">
         <CtrlButton onClick={() => requestCenter()} label="Центрировать на маяке">
           <LocateFixed className="size-5 text-primary" />
         </CtrlButton>
       </div>
 
       {/* zoom */}
-      <div className="glass flex flex-col overflow-hidden rounded-2xl">
+      <div className="glass flex flex-col overflow-hidden rounded-lg">
         <CtrlButton onClick={() => setZoom((z) => z + 1)} label="Приблизить">
           <Plus className="size-5" />
         </CtrlButton>
