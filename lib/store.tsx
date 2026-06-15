@@ -55,6 +55,7 @@ function uid(): string {
 }
 
 const MIN_INTERVAL_MS = 5_000
+const DARK_DEFAULT_BEACON_COLOR = "#33ccff"
 
 const DEFAULT_SETTINGS: BeaconSettings = {
   visible: true,
@@ -75,7 +76,7 @@ const DEFAULT_SETTINGS: BeaconSettings = {
   alarmSound: "beep",
   continuousAlarm: true,
   mapHue: 40,
-  beaconColor: "#ef4444",
+  beaconColor: DARK_DEFAULT_BEACON_COLOR,
   panelWidth: 340,
 }
 
@@ -161,7 +162,7 @@ interface StoreValue {
   scenarios: Scenario[]
   addScenario: () => void
   updateScenario: (id: string, patch: Partial<Omit<Scenario, "id" | "steps">>) => void
-  removeScenario: () => void
+  removeScenario: (id?: string) => void
   addScenarioStep: (scenarioId: string) => void
   updateScenarioStep: (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => void
   removeScenarioStep: (scenarioId: string, stepId: string) => void
@@ -222,7 +223,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
 
   const toggleTheme = useCallback(() => setTheme((t) => (t === "dark" ? "light" : "dark")), [])
   const toggleLayer = useCallback((l: MapLayer) => setLayers((prev) => ({ ...prev, [l]: !prev[l] })), [])
-  const setZoom = useCallback((z: number | ((z: number) => number)) => setZoomState((prev) => Math.max(2, Math.min(19, Math.round(typeof z === "function" ? z(prev) : z)))), [])
+  const setZoom = useCallback((z: number | ((z: number) => number)) => setZoomState((prev) => Math.max(2, Math.min(19, Math.round(typeof z === "function" ? z(prev) : z))), [])
   const toggleRotationMode = useCallback(() => setRotationMode((m) => (m === "north" ? "movement" : "north")), [])
   const requestCenter = useCallback((p?: LatLng) => setCenterRequest({ position: p ?? positionRef.current, nonce: Date.now() }), [])
   const updateSettings = useCallback((patch: Partial<BeaconSettings>) => {
@@ -236,7 +237,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const pushHistory = useCallback((entry: Omit<HistoryEntry, "id" | "at">) => {
-    setHistory((prev) => [{ ...entry, id: uid(), at: Date.now() }, ...prev].slice(0, 200))
+    setHistory((prev) => [{ ...entry, id: uid(), at: Date.now(), ...entry }, ...prev].slice(0, 200))
   }, [])
 
   const evaluateGeofences = useCallback((pos: LatLng) => {
@@ -277,7 +278,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
         to = moveByDistance(node.pos, s.stepMeters, nextHeading)
       } else {
         nextHeading = calcBearing(from, node.pos)
-        to = moveByDistance(from, s.stepMeters, nextHeading)
+        to = moveByDistance(from, node.pos, nextHeading) as never
       }
     } else {
       nextHeading = bearingFromDirection(s.direction)
