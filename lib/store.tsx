@@ -72,7 +72,8 @@ const DEFAULT_SETTINGS: BeaconSettings = {
   pulseScale: 5,
   soundEnabled: true,
   soundVolume: 0.4,
-  alarmSound: "default-alarm",
+  alarmSound: "beep",
+  continuousAlarm: true,
   mapHue: 40,
   beaconColor: "#ef4444",
   panelWidth: 340,
@@ -117,56 +118,14 @@ const DEFAULT_SCENARIOS: Scenario[] = [
 ]
 
 const INITIAL_OBJECTS: TrackedObject[] = [
-  {
-    id: "beacon-1",
-    name: "Маяк-01",
-    type: "vehicle",
-    online: true,
-    battery: 87,
-    position: SPB_ROUTE[0],
-    street: "Невский проспект",
-  },
-  {
-    id: "beacon-2",
-    name: "Курьер-14",
-    type: "person",
-    online: true,
-    battery: 62,
-    position: [59.9311, 30.3609],
-    street: "Лиговский проспект",
-  },
-  {
-    id: "beacon-3",
-    name: "Груз-А7",
-    type: "asset",
-    online: false,
-    battery: 18,
-    position: [59.9501, 30.3056],
-    street: "Дворцовая набережная",
-  },
+  { id: "beacon-1", name: "Маяк-01", type: "vehicle", online: true, battery: 87, position: SPB_ROUTE[0], street: "Невский проспект" },
+  { id: "beacon-2", name: "Курьер-14", type: "person", online: true, battery: 62, position: [59.9311, 30.3609], street: "Лиговский проспект" },
+  { id: "beacon-3", name: "Груз-А7", type: "asset", online: false, battery: 18, position: [59.9501, 30.3056], street: "Дворцовая набережная" },
 ]
 
 const INITIAL_GEOFENCES: Geofence[] = [
-  {
-    id: uid(),
-    name: "Центр",
-    center: [59.9386, 30.3141],
-    radius: 1200,
-    active: true,
-    color: "#a855f7",
-    alertOnEnter: true,
-    alertOnExit: true,
-  },
-  {
-    id: uid(),
-    name: "Площадь Восстания",
-    center: [59.9311, 30.3609],
-    radius: 600,
-    active: false,
-    color: "#f59e0b",
-    alertOnEnter: true,
-    alertOnExit: false,
-  },
+  { id: uid(), name: "Центр", center: [59.9386, 30.3141], radius: 1200, active: true, color: "#a855f7", alertOnEnter: true, alertOnExit: true },
+  { id: uid(), name: "Площадь Восстания", center: [59.9311, 30.3609], radius: 600, active: false, color: "#f59e0b", alertOnEnter: true, alertOnExit: false },
 ]
 
 interface StoreValue {
@@ -202,7 +161,7 @@ interface StoreValue {
   scenarios: Scenario[]
   addScenario: () => void
   updateScenario: (id: string, patch: Partial<Omit<Scenario, "id" | "steps">>) => void
-  removeScenario: (id: string) => void
+  removeScenario: () => void
   addScenarioStep: (scenarioId: string) => void
   updateScenarioStep: (scenarioId: string, stepId: string, patch: Partial<ScenarioStep>) => void
   removeScenarioStep: (scenarioId: string, stepId: string) => void
@@ -219,14 +178,7 @@ export function useStore(): StoreValue {
 export function BeaconStoreProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<ThemeMode>("dark")
   const [activePanel, setActivePanel] = useState<PanelId>("map")
-
-  const [layers, setLayers] = useState<Record<MapLayer, boolean>>({
-    traffic: false,
-    transport: false,
-    roads: true,
-    labels: true,
-    buildings: true,
-  })
+  const [layers, setLayers] = useState<Record<MapLayer, boolean>>({ traffic: false, transport: false, roads: true, labels: true, buildings: true })
   const [zoom, setZoomState] = useState(13)
   const [rotationMode, setRotationMode] = useState<RotationMode>("north")
   const [heading, setHeading] = useState(0)
@@ -237,9 +189,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
   const [street, setStreet] = useState(SPB_STREETS[0])
   const [moving, setMoving] = useState(false)
   const [objects] = useState<TrackedObject[]>(INITIAL_OBJECTS)
-  const [history, setHistory] = useState<HistoryEntry[]>([
-    { id: uid(), at: Date.now(), position: SPB_ROUTE[0], speedKmh: 0, street: SPB_STREETS[0], event: "start", note: "Отслеживание запущено" },
-  ])
+  const [history, setHistory] = useState<HistoryEntry[]>([{ id: uid(), at: Date.now(), position: SPB_ROUTE[0], speedKmh: 0, street: SPB_STREETS[0], event: "start", note: "Отслеживание запущено" }])
   const [geofences, setGeofences] = useState<Geofence[]>(INITIAL_GEOFENCES)
   const [insideGeofenceIds, setInsideGeofenceIds] = useState<string[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>(DEFAULT_SCENARIOS)
@@ -281,6 +231,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
       ...patch,
       intervalMs: Math.max(MIN_INTERVAL_MS, patch.intervalMs ?? prev.intervalMs),
       alarmSound: patch.alarmSound ?? prev.alarmSound ?? "beep",
+      continuousAlarm: patch.continuousAlarm ?? prev.continuousAlarm ?? true,
     }))
   }, [])
 
@@ -313,7 +264,7 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
     const s = settingsRef.current
     const from = positionRef.current
     let to: LatLng
-    let heading: number
+    let nextHeading: number
     if (s.followRoute) {
       const node = currentNodeRef.current
       const arrivalBearing = arrivalBearingRef.current
@@ -322,17 +273,17 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
         const { node: nextNode, exitBearing } = pickNextNode(node, arrivalBearing)
         currentNodeRef.current = nextNode
         arrivalBearingRef.current = exitBearing
-        heading = exitBearing
-        to = moveByDistance(node.pos, s.stepMeters, heading)
+        nextHeading = exitBearing
+        to = moveByDistance(node.pos, s.stepMeters, nextHeading)
       } else {
-        heading = calcBearing(from, node.pos)
-        to = moveByDistance(from, s.stepMeters, heading)
+        nextHeading = calcBearing(from, node.pos)
+        to = moveByDistance(from, s.stepMeters, nextHeading)
       }
     } else {
-      heading = bearingFromDirection(s.direction)
-      to = moveByDistance(from, s.stepMeters, heading)
+      nextHeading = bearingFromDirection(s.direction)
+      to = moveByDistance(from, s.stepMeters, nextHeading)
       currentNodeRef.current = nearestNode(to)
-      arrivalBearingRef.current = heading
+      arrivalBearingRef.current = nextHeading
     }
     const dist = distanceMeters(from, to)
     const speed = Math.round((dist / (s.intervalMs / 1000)) * 3.6)
@@ -342,9 +293,9 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
     setSpeedKmh(speed)
     setStreet(nextStreet)
     setMoving(true)
-    setHeading(heading)
+    setHeading(nextHeading)
     pushHistory({ position: to, speedKmh: speed, street: nextStreet, event: "move" })
-    if (s.soundEnabled) playAlarm(s.alarmSound, s.soundVolume)
+    if (s.soundEnabled && !s.continuousAlarm) playAlarm(s.alarmSound, s.soundVolume)
     evaluateGeofences(to)
     window.setTimeout(() => setMoving(false), Math.min(900, Math.max(100, s.intervalMs - 100)))
   }, [evaluateGeofences, pushHistory])
@@ -399,13 +350,13 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
         if (step.stepMeters > 0) {
           const s = settingsRef.current
           const from = positionRef.current
-          let heading: number
+          let nextHeading: number
           let to: LatLng
           if (step.direction) {
-            heading = bearingFromDirection(step.direction)
-            to = moveByDistance(from, step.stepMeters, heading)
+            nextHeading = bearingFromDirection(step.direction)
+            to = moveByDistance(from, step.stepMeters, nextHeading)
             currentNodeRef.current = nearestNode(to)
-            arrivalBearingRef.current = heading
+            arrivalBearingRef.current = nextHeading
           } else if (s.followRoute) {
             const node = currentNodeRef.current
             const distToNode = distanceMeters(from, node.pos)
@@ -413,15 +364,15 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
               const { node: nextNode, exitBearing } = pickNextNode(node, arrivalBearingRef.current)
               currentNodeRef.current = nextNode
               arrivalBearingRef.current = exitBearing
-              heading = exitBearing
-              to = moveByDistance(node.pos, step.stepMeters, heading)
+              nextHeading = exitBearing
+              to = moveByDistance(node.pos, step.stepMeters, nextHeading)
             } else {
-              heading = calcBearing(from, node.pos)
-              to = moveByDistance(from, step.stepMeters, heading)
+              nextHeading = calcBearing(from, node.pos)
+              to = moveByDistance(from, step.stepMeters, nextHeading)
             }
           } else {
-            heading = bearingFromDirection(s.direction)
-            to = moveByDistance(from, step.stepMeters, heading)
+            nextHeading = bearingFromDirection(s.direction)
+            to = moveByDistance(from, step.stepMeters, nextHeading)
           }
           const dist = distanceMeters(from, to)
           const speed = Math.round((dist / (step.delayMs / 1000)) * 3.6)
@@ -431,9 +382,9 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
           setSpeedKmh(speed)
           setStreet(nextStreet)
           setMoving(true)
-          setHeading(heading)
+          setHeading(nextHeading)
           pushHistory({ position: to, speedKmh: speed, street: nextStreet, event: "move" })
-          if (s.soundEnabled) playAlarm(s.alarmSound, s.soundVolume)
+          if (s.soundEnabled && !s.continuousAlarm) playAlarm(s.alarmSound, s.soundVolume)
           evaluateGeofences(to)
           window.setTimeout(() => setMoving(false), Math.min(900, Math.max(100, step.delayMs - 50)))
         }
@@ -451,7 +402,8 @@ export function BeaconStoreProvider({ children }: { children: React.ReactNode })
 
   const addScenario = useCallback(() => setScenarios((prev) => [...prev, { id: uid(), name: `Сценарий ${prev.length + 1}`, loop: true, steps: [{ id: uid(), delayMs: 2000, stepMeters: 20, direction: null }] }]), [])
   const updateScenario = useCallback((id: string, patch: Partial<Omit<Scenario, "id" | "steps">>) => setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s))), [])
-  const removeScenario = useCallback((id: string) => {
+  const removeScenario = useCallback((id?: string) => {
+    if (!id) return
     setScenarios((prev) => prev.filter((s) => s.id !== id))
     setSettings((prev) => prev.activeScenarioId === id ? { ...prev, activeScenarioId: null, scenarioEnabled: false } : prev)
   }, [])
