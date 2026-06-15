@@ -36,7 +36,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
         {title}
       </h3>
-      <div className="space-y-4 rounded-xl border border-border bg-card px-4 py-4">
+      <div className="space-y-4 rounded-xl bg-card px-4 py-4">
         {children}
       </div>
     </section>
@@ -44,7 +44,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function Divider() {
-  return <div className="h-px bg-border" />
+  return <div className="h-px bg-border/60" />
 }
 
 function ToggleRow({
@@ -135,7 +135,7 @@ function IntervalRow({
               const v = Number(e.target.value)
               if (!isNaN(v) && v >= 100 && v <= 3_600_000) onChange(v)
             }}
-            className="h-7 w-24 rounded-md border border-border bg-background px-2 text-right font-mono text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+            className="h-7 w-24 rounded-md bg-background px-2 text-right font-mono text-xs tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
             aria-label="Интервал в миллисекундах"
           />
           <span className="text-xs text-muted-foreground">мс</span>
@@ -164,12 +164,14 @@ export function SettingsPanel() {
   const { settings, updateSettings, theme, toggleTheme, zoom, setZoom } = useStore()
 
   return (
-    <div className="flex h-full flex-col">
-      <DisplayModeSettings />
-      <PanelHeader title="Настройки" subtitle="Параметры маяка и приложения" />
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="shrink-0">
+        <DisplayModeSettings />
+        <PanelHeader title="Настройки" subtitle="Параметры маяка и приложения" />
+      </div>
 
-      <ScrollArea className="flex-1 overflow-hidden">
-        <div className="space-y-6 px-4 py-5 pb-8">
+      <ScrollArea className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+        <div className="space-y-6 px-4 py-5 pb-[calc(2rem+env(safe-area-inset-bottom))]">
 
           {/* ── Интерфейс ── */}
           <Section title="Интерфейс">
@@ -397,7 +399,7 @@ export function SettingsPanel() {
               type="button"
               disabled={!settings.soundEnabled}
               onClick={() => playBeep(settings.soundVolume)}
-              className="w-full rounded-lg border border-border px-4 py-3 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-40"
+              className="w-full rounded-lg px-4 py-3 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-40"
             >
               Проверить сигнал
             </button>
