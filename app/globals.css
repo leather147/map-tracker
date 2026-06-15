@@ -52,7 +52,6 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Light theme: cool violet-tinted neutrals, warm amber accent, red beacon */
 :root {
   color-scheme: light;
   --background: oklch(0.97 0.01 295);
@@ -91,17 +90,14 @@
   --sidebar-accent-foreground: oklch(0.3 0.06 295);
   --sidebar-border: oklch(0.89 0.02 295);
   --sidebar-ring: oklch(0.5 0.18 295);
-  /* gradients */
   --grad-primary: linear-gradient(135deg, oklch(0.52 0.2 295), oklch(0.44 0.22 315));
   --grad-warm: linear-gradient(135deg, oklch(0.82 0.17 75), oklch(0.74 0.19 55));
   --grad-panel: linear-gradient(180deg, oklch(1 0 0 / 0.92) 0%, oklch(0.97 0.01 295 / 0.96) 100%);
-  /* glow shadows */
   --glow-primary: 0 0 20px -4px oklch(0.5 0.18 295 / 0.4), 0 0 40px -12px oklch(0.5 0.18 295 / 0.2);
   --glow-beacon:  0 0 16px -3px oklch(0.58 0.24 27 / 0.55), 0 0 32px -10px oklch(0.58 0.24 27 / 0.3);
   --glow-warm:    0 0 18px -4px oklch(0.78 0.16 75 / 0.45);
 }
 
-/* Dark theme: deep violet like Yandex Maps dark, warm amber accent, red beacon */
 .dark {
   color-scheme: dark;
   --background: oklch(0.17 0.03 290);
@@ -139,11 +135,9 @@
   --sidebar-accent-foreground: oklch(0.94 0.01 295);
   --sidebar-border: oklch(0.32 0.04 290);
   --sidebar-ring: oklch(0.62 0.19 295);
-  /* gradients */
   --grad-primary: linear-gradient(135deg, oklch(0.67 0.22 295), oklch(0.55 0.24 315));
   --grad-warm: linear-gradient(135deg, oklch(0.84 0.18 75), oklch(0.76 0.2 55));
   --grad-panel: linear-gradient(180deg, oklch(0.21 0.035 290 / 0.95) 0%, oklch(0.17 0.03 290 / 0.98) 100%);
-  /* glow shadows */
   --glow-primary: 0 0 24px -4px oklch(0.62 0.19 295 / 0.5), 0 0 48px -12px oklch(0.62 0.19 295 / 0.28);
   --glow-beacon:  0 0 20px -3px oklch(0.62 0.25 27 / 0.65), 0 0 40px -10px oklch(0.62 0.25 27 / 0.35);
   --glow-warm:    0 0 22px -4px oklch(0.8 0.16 75 / 0.5);
@@ -159,7 +153,6 @@
   html {
     @apply font-sans;
   }
-  /* Smooth theme transitions across the whole UI */
   :root,
   .dark {
     --ease-glass: cubic-bezier(0.22, 1, 0.36, 1);
@@ -180,28 +173,26 @@
   }
 }
 
-/* ===== Glass surfaces ===== */
 .glass {
   background: var(--grad-panel);
   backdrop-filter: blur(24px) saturate(1.5);
   -webkit-backdrop-filter: blur(24px) saturate(1.5);
-  border: 1px solid color-mix(in oklch, var(--border) 65%, transparent);
+  border: 0;
   box-shadow:
-    0 8px 32px -8px color-mix(in oklch, var(--background) 60%, transparent),
-    inset 0 1px 0 0 color-mix(in oklch, var(--foreground) 7%, transparent);
+    0 8px 32px -12px color-mix(in oklch, var(--background) 64%, transparent),
+    inset 0 1px 0 0 color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
 .glass-strong {
   background: var(--grad-panel);
   backdrop-filter: blur(32px) saturate(1.6);
   -webkit-backdrop-filter: blur(32px) saturate(1.6);
-  border: 1px solid color-mix(in oklch, var(--border) 75%, transparent);
+  border: 0;
   box-shadow:
-    0 16px 48px -12px color-mix(in oklch, var(--background) 70%, transparent),
-    inset 0 1px 0 0 color-mix(in oklch, var(--foreground) 9%, transparent);
+    0 16px 48px -18px color-mix(in oklch, var(--background) 72%, transparent),
+    inset 0 1px 0 0 color-mix(in oklch, var(--foreground) 6%, transparent);
 }
 
-/* ===== Gradient button helpers ===== */
 .btn-gradient {
   background: var(--grad-primary);
   box-shadow: var(--glow-primary);
@@ -210,12 +201,10 @@
 .btn-gradient:hover { filter: brightness(1.08); }
 .btn-gradient:active { transform: scale(0.94); }
 
-/* ===== Glow helpers ===== */
 .glow-primary { box-shadow: var(--glow-primary); }
 .glow-beacon  { box-shadow: var(--glow-beacon); }
 .glow-warm    { box-shadow: var(--glow-warm); }
 
-/* ===== Skeleton shimmer ===== */
 @keyframes skeleton-shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -235,19 +224,11 @@
   .skeleton { animation: none; }
 }
 
-/* ===== Dark-theme Yandex map filter =====
-   Applied only to the map container div when theme === "dark" AND the real
-   Yandex v2.1 tiles are loaded. Inverts the light base map to dark. */
 .map-dark-filter {
-  /* --map-hue is set by the store (default 40deg).
-     invert(92%) flips the light Yandex tiles to dark; hue-rotate shifts
-     the resulting green-teal palette. 40deg = blue/violet (opposite to
-     the natural 220deg green side). Adjustable in Settings → Карта. */
   filter: invert(92%) hue-rotate(var(--map-hue, 40deg)) saturate(1.3) brightness(0.88);
   transition: filter 0.4s ease;
 }
 
-/* ===== Beacon movement animation ===== */
 @keyframes beacon-move {
   0%   { transform: translate(-50%, -50%) scale(1)    translateY(0px); }
   18%  { transform: translate(-50%, -50%) scale(1.18) translateY(-5px); }
@@ -259,125 +240,4 @@
 .beacon-moving {
   animation: beacon-move 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform;
-}
-
-/* Idle float — very subtle up/down drift when not moving */
-@keyframes beacon-float {
-  0%,100% { transform: translate(-50%, -50%) translateY(0px) scale(1); }
-  50%      { transform: translate(-50%, -50%) translateY(-2.5px) scale(1.015); }
-}
-.beacon-float {
-  animation: beacon-float 3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  will-change: transform;
-}
-
-/* ===== Beacon toast (movement notification) ===== */
-@keyframes badge-in {
-  0%   { opacity: 0; transform: translateY(-12px) scale(0.85); }
-  60%  { opacity: 1; transform: translateY(2px) scale(1.04); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes badge-out {
-  0%   { opacity: 1; transform: translateY(0) scale(1); }
-  100% { opacity: 0; transform: translateY(-8px) scale(0.9); }
-}
-.beacon-toast-in  { animation: badge-in  0.36s var(--ease-glass, ease) both; }
-.beacon-toast-out { animation: badge-out 0.28s var(--ease-glass, ease) both; }
-
-/* ===== Counter-filter for beacon dot =====
-   The dot sits inside .map-dark-filter which applies invert+hue-rotate.
-   We undo exactly that transform so the dot always shows its real color. */
-.beacon-counter-filter {
-  /* first invert back (1/0.92 ≈ 1.087 ≈ 100% is close enough; double invert is identity),
-     then rotate hue in the opposite direction. */
-  filter: invert(100%) hue-rotate(calc(180deg - var(--map-hue, 40deg)));
-  /* when not inside a map filter, the double invert is transparent — keep it */
-}
-/* Outside map filter (light mode / no filter parent): just be transparent to avoid invert */
-.no-map-filter .beacon-counter-filter {
-  filter: none;
-}
-@keyframes panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes sheet-up {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.animate-panel-in {
-  animation: panel-in 0.45s var(--ease-glass, ease) both;
-}
-.animate-sheet-up {
-  animation: sheet-up 0.45s var(--ease-glass, ease) both;
-}
-.animate-fade-in {
-  animation: panel-in 0.35s var(--ease-glass, ease) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .animate-panel-in,
-  .animate-sheet-up,
-  .animate-fade-in {
-    animation: none;
-  }
-  body,
-  .glass,
-  .glass-strong,
-  button,
-  nav,
-  [role="dialog"] {
-    transition: none;
-  }
-}
-
-/* Beacon pulse animation, driven by CSS variables so it can be configured/disabled */
-@keyframes beacon-pulse {
-  0% {
-    transform: scale(1);
-    opacity: var(--beacon-pulse-opacity, 0.55);
-  }
-  60% {
-    opacity: 0.12;
-  }
-  100% {
-    transform: scale(var(--beacon-pulse-scale, 3.2));
-    opacity: 0;
-  }
-}
-
-.beacon-ring {
-  animation: beacon-pulse var(--beacon-pulse-duration, 2s) cubic-bezier(0.2, 0.8, 0.4, 1) infinite;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .beacon-ring,
-  .beacon-moving,
-  .beacon-float {
-    animation: none;
-    will-change: auto;
-  }
 }
