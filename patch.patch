@@ -1,0 +1,390 @@
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 0000000..0000000 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
+ import type { Metadata, Viewport } from 'next'
+ import { Geist, Geist_Mono } from 'next/font/google'
+ import './globals.css'
++import { DisplayModeManager } from '@/components/display-mode-manager'
+ 
+ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
+ const geistMono = Geist_Mono({
+@@ -53,6 +54,7 @@ export default function RootLayout({
+     <html lang="ru" className={`dark ${geistSans.variable} ${geistMono.variable} bg-background`}>
+       <body className="font-sans antialiased">
+         {children}
++        <DisplayModeManager />
+         {process.env.NODE_ENV === 'production' && <Analytics />}
+       </body>
+     </html>
+diff --git a/components/display-mode-manager.tsx b/components/display-mode-manager.tsx
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/components/display-mode-manager.tsx
+@@ -0,0 +1,222 @@
++"use client"
++
++import { useCallback, useEffect, useRef, useState } from "react"
++import { Maximize2, Minimize2 } from "lucide-react"
++import {
++  DISPLAY_PREFERENCES_EVENT,
++  readDisplayPreferences,
++  type DisplayPreferences,
++} from "@/lib/display-preferences"
++
++type WakeLockSentinelLike = EventTarget & {
++  released: boolean
++  release: () => Promise<void>
++}
++
++type NavigatorWithWakeLock = Navigator & {
++  wakeLock?: {
++    request: (type: "screen") => Promise<WakeLockSentinelLike>
++  }
++}
++
++type FullscreenDocument = Document & {
++  webkitFullscreenElement?: Element | null
++  webkitExitFullscreen?: () => Promise<void> | void
++}
++
++type FullscreenElement = HTMLElement & {
++  webkitRequestFullscreen?: () => Promise<void> | void
++}
++
++function getFullscreenElement() {
++  const fullscreenDocument = document as FullscreenDocument
++  return document.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement ?? null
++}
++
++async function requestPageFullscreen() {
++  const root = document.documentElement as FullscreenElement
++
++  if (root.requestFullscreen) {
++    await root.requestFullscreen()
++    return
++  }
++
++  await root.webkitRequestFullscreen?.()
++}
++
++async function exitPageFullscreen() {
++  const fullscreenDocument = document as FullscreenDocument
++
++  if (document.exitFullscreen) {
++    await document.exitFullscreen()
++    return
++  }
++
++  await fullscreenDocument.webkitExitFullscreen?.()
++}
++
++export function DisplayModeManager() {
++  const wakeLockRef = useRef<WakeLockSentinelLike | null>(null)
++  const [preferences, setPreferences] = useState<DisplayPreferences>({
++    fullscreenDefault: true,
++    wakeLockEnabled: true,
++  })
++  const [isFullscreen, setIsFullscreen] = useState(false)
++
++  const syncFullscreenState = useCallback(() => {
++    setIsFullscreen(Boolean(getFullscreenElement()))
++  }, [])
++
++  const releaseWakeLock = useCallback(async () => {
++    const wakeLock = wakeLockRef.current
++    wakeLockRef.current = null
++
++    if (wakeLock && !wakeLock.released) {
++      await wakeLock.release().catch(() => undefined)
++    }
++  }, [])
++
++  const requestWakeLock = useCallback(async () => {
++    if (!preferences.wakeLockEnabled || document.visibilityState !== "visible") return
++
++    const navigatorWithWakeLock = navigator as NavigatorWithWakeLock
++    if (!navigatorWithWakeLock.wakeLock?.request) return
++    if (wakeLockRef.current && !wakeLockRef.current.released) return
++
++    try {
++      const wakeLock = await navigatorWithWakeLock.wakeLock.request("screen")
++      wakeLockRef.current = wakeLock
++      wakeLock.addEventListener("release", () => {
++        if (wakeLockRef.current === wakeLock) wakeLockRef.current = null
++      })
++    } catch {
++      // Wake Lock may be unavailable on unsupported browsers or power-saving modes.
++    }
++  }, [preferences.wakeLockEnabled])
++
++  useEffect(() => {
++    setPreferences(readDisplayPreferences())
++
++    const handlePreferencesChange = (event: Event) => {
++      const customEvent = event as CustomEvent<DisplayPreferences>
++      if (customEvent.detail) setPreferences(customEvent.detail)
++    }
++
++    const handleStorageChange = () => {
++      setPreferences(readDisplayPreferences())
++    }
++
++    window.addEventListener(DISPLAY_PREFERENCES_EVENT, handlePreferencesChange)
++    window.addEventListener("storage", handleStorageChange)
++
++    return () => {
++      window.removeEventListener(DISPLAY_PREFERENCES_EVENT, handlePreferencesChange)
++      window.removeEventListener("storage", handleStorageChange)
++    }
++  }, [])
++
++  useEffect(() => {
++    syncFullscreenState()
++
++    document.addEventListener("fullscreenchange", syncFullscreenState)
++    document.addEventListener("webkitfullscreenchange", syncFullscreenState)
++
++    return () => {
++      document.removeEventListener("fullscreenchange", syncFullscreenState)
++      document.removeEventListener("webkitfullscreenchange", syncFullscreenState)
++    }
++  }, [syncFullscreenState])
++
++  useEffect(() => {
++    if (!preferences.fullscreenDefault || isFullscreen) return
++
++    const tryEnterFullscreen = async () => {
++      if (!readDisplayPreferences().fullscreenDefault || getFullscreenElement()) return
++
++      try {
++        await requestPageFullscreen()
++        syncFullscreenState()
++      } catch {
++        // Fullscreen is browser-gated. The first click, tap, or keypress will retry it.
++      }
++    }
++
++    const handleFirstGesture = () => {
++      void tryEnterFullscreen()
++    }
++
++    void tryEnterFullscreen()
++
++    window.addEventListener("click", handleFirstGesture, { once: true })
++    window.addEventListener("touchstart", handleFirstGesture, { once: true, passive: true })
++    window.addEventListener("keydown", handleFirstGesture, { once: true })
++
++    return () => {
++      window.removeEventListener("click", handleFirstGesture)
++      window.removeEventListener("touchstart", handleFirstGesture)
++      window.removeEventListener("keydown", handleFirstGesture)
++    }
++  }, [preferences.fullscreenDefault, isFullscreen, syncFullscreenState])
++
++  useEffect(() => {
++    if (!preferences.wakeLockEnabled) {
++      void releaseWakeLock()
++      return
++    }
++
++    const activateWakeLock = () => {
++      void requestWakeLock()
++    }
++
++    const handleVisibilityChange = () => {
++      if (document.visibilityState === "visible") {
++        void requestWakeLock()
++      } else {
++        void releaseWakeLock()
++      }
++    }
++
++    void requestWakeLock()
++
++    window.addEventListener("pointerdown", activateWakeLock, { passive: true })
++    window.addEventListener("touchstart", activateWakeLock, { passive: true })
++    window.addEventListener("keydown", activateWakeLock)
++    document.addEventListener("visibilitychange", handleVisibilityChange)
++
++    return () => {
++      window.removeEventListener("pointerdown", activateWakeLock)
++      window.removeEventListener("touchstart", activateWakeLock)
++      window.removeEventListener("keydown", activateWakeLock)
++      document.removeEventListener("visibilitychange", handleVisibilityChange)
++      void releaseWakeLock()
++    }
++  }, [preferences.wakeLockEnabled, requestWakeLock, releaseWakeLock])
++
++  async function handleFullscreenToggle() {
++    try {
++      if (getFullscreenElement()) {
++        await exitPageFullscreen()
++      } else {
++        await requestPageFullscreen()
++      }
++    } finally {
++      syncFullscreenState()
++    }
++  }
++
++  return (
++    <button
++      type="button"
++      onClick={handleFullscreenToggle}
++      aria-label={isFullscreen ? "Выйти из полноэкранного режима" : "Войти в полноэкранный режим"}
++      title={isFullscreen ? "Выйти из полноэкранного режима" : "Войти в полноэкранный режим"}
++      className="fixed right-3 top-3 z-[100] grid size-10 place-items-center rounded-full border border-border bg-background/85 text-foreground shadow-lg backdrop-blur transition-all hover:bg-accent active:scale-95 sm:right-4 sm:top-4"
++    >
++      {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
++    </button>
++  )
++}
+diff --git a/lib/display-preferences.ts b/lib/display-preferences.ts
+new file mode 100644
+index 0000000..0000000
+--- /dev/null
++++ b/lib/display-preferences.ts
+@@ -0,0 +1,52 @@
+++export const FULLSCREEN_DEFAULT_KEY = "map-tracker:fullscreen-default-enabled"
+++export const WAKE_LOCK_ENABLED_KEY = "map-tracker:wake-lock-enabled"
+++export const DISPLAY_PREFERENCES_EVENT = "map-tracker:display-preferences-change"
+++
+++export type DisplayPreferences = {
+++  fullscreenDefault: boolean
+++  wakeLockEnabled: boolean
+++}
+++
+++export const DEFAULT_DISPLAY_PREFERENCES: DisplayPreferences = {
+++  fullscreenDefault: true,
+++  wakeLockEnabled: true,
+++}
+++
+++function readBooleanPreference(key: string, fallback: boolean) {
+++  if (typeof window === "undefined") return fallback
+++
+++  const value = window.localStorage.getItem(key)
+++  if (value === null) return fallback
+++
+++  return value === "true"
+++}
+++
+++export function readDisplayPreferences(): DisplayPreferences {
+++  return {
+++    fullscreenDefault: readBooleanPreference(
+++      FULLSCREEN_DEFAULT_KEY,
+++      DEFAULT_DISPLAY_PREFERENCES.fullscreenDefault,
+++    ),
+++    wakeLockEnabled: readBooleanPreference(
+++      WAKE_LOCK_ENABLED_KEY,
+++      DEFAULT_DISPLAY_PREFERENCES.wakeLockEnabled,
+++    ),
+++  }
+++}
+++
+++export function saveDisplayPreferences(preferences: Partial<DisplayPreferences>) {
+++  if (typeof window === "undefined") return DEFAULT_DISPLAY_PREFERENCES
+++
+++  const next = {
+++    ...readDisplayPreferences(),
+++    ...preferences,
+++  }
+++
+++  window.localStorage.setItem(FULLSCREEN_DEFAULT_KEY, String(next.fullscreenDefault))
+++  window.localStorage.setItem(WAKE_LOCK_ENABLED_KEY, String(next.wakeLockEnabled))
+++  window.dispatchEvent(new CustomEvent<DisplayPreferences>(DISPLAY_PREFERENCES_EVENT, { detail: next }))
+++
+++  return next
+++}
+diff --git a/components/panels/settings-panel.tsx b/components/panels/settings-panel.tsx
+index 0000000..0000000 100644
+--- a/components/panels/settings-panel.tsx
++++ b/components/panels/settings-panel.tsx
+@@ -1,5 +1,6 @@
++ "use client"
++ 
+++import { useEffect, useState } from "react"
++ import { useStore } from "@/lib/store"
++ import { PanelHeader } from "@/components/panels/panel-header"
++ import { ScenarioEditor } from "@/components/panels/scenario-editor"
+@@ -17,6 +18,12 @@ import {
++ import { playBeep } from "@/lib/sound"
++ import { getSliderNumber } from "@/lib/slider-value"
++ import type { Direction } from "@/lib/types"
+++import {
+++  DISPLAY_PREFERENCES_EVENT,
+++  readDisplayPreferences,
+++  saveDisplayPreferences,
+++  type DisplayPreferences,
+++} from "@/lib/display-preferences"
++ 
++ const DIRECTIONS: { value: Direction; label: string }[] = [
++   { value: "N",  label: "Север ↑" },
+@@ -155,6 +162,39 @@ function IntervalRow({
++ 
++ export function SettingsPanel() {
++   const { settings, updateSettings, theme, toggleTheme, zoom, setZoom } = useStore()
+++  const [fullscreenDefault, setFullscreenDefault] = useState(true)
+++  const [wakeLockEnabled, setWakeLockEnabled] = useState(true)
+++
+++  useEffect(() => {
+++    const applyDisplayPreferences = (preferences: DisplayPreferences) => {
+++      setFullscreenDefault(preferences.fullscreenDefault)
+++      setWakeLockEnabled(preferences.wakeLockEnabled)
+++    }
+++
+++    applyDisplayPreferences(readDisplayPreferences())
+++
+++    const handlePreferencesChange = (event: Event) => {
+++      const customEvent = event as CustomEvent<DisplayPreferences>
+++      if (customEvent.detail) applyDisplayPreferences(customEvent.detail)
+++    }
+++
+++    const handleStorageChange = () => {
+++      applyDisplayPreferences(readDisplayPreferences())
+++    }
+++
+++    window.addEventListener(DISPLAY_PREFERENCES_EVENT, handlePreferencesChange)
+++    window.addEventListener("storage", handleStorageChange)
+++
+++    return () => {
+++      window.removeEventListener(DISPLAY_PREFERENCES_EVENT, handlePreferencesChange)
+++      window.removeEventListener("storage", handleStorageChange)
+++    }
+++  }, [])
+++
+++  function handleFullscreenDefaultChange(value: boolean) {
+++    setFullscreenDefault(value)
+++    saveDisplayPreferences({ fullscreenDefault: value })
+++  }
+++
+++  function handleWakeLockEnabledChange(value: boolean) {
+++    setWakeLockEnabled(value)
+++    saveDisplayPreferences({ wakeLockEnabled: value })
+++  }
++ 
++   return (
++     <div className="flex h-full flex-col">
+@@ -174,6 +214,20 @@ export function SettingsPanel() {
++               step={20}
++               onChange={(v) => updateSettings({ panelWidth: v })}
++             />
+++            <Divider />
+++            <ToggleRow
+++              label="Полноэкранный режим по умолчанию"
+++              desc="После первого клика или тапа сайт разворачивается на весь экран"
+++              checked={fullscreenDefault}
+++              onChange={handleFullscreenDefaultChange}
+++            />
+++            <Divider />
+++            <ToggleRow
+++              label="Не выключать экран"
+++              desc="Телефон не уходит в сон, пока сайт открыт и браузер поддерживает Wake Lock"
+++              checked={wakeLockEnabled}
+++              onChange={handleWakeLockEnabledChange}
+++            />
++           </Section>
++ 
++           {/* ── Отображение ── */}

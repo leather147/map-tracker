@@ -17,6 +17,7 @@ import {
 import { playBeep } from "@/lib/sound"
 import { getSliderNumber } from "@/lib/slider-value"
 import type { Direction } from "@/lib/types"
+import { DisplayModeSettings } from "@/components/display-mode-settings"
 
 const DIRECTIONS: { value: Direction; label: string }[] = [
   { value: "N",  label: "Север ↑" },
@@ -164,6 +165,7 @@ export function SettingsPanel() {
 
   return (
     <div className="flex h-full flex-col">
+      <DisplayModeSettings />
       <PanelHeader title="Настройки" subtitle="Параметры маяка и приложения" />
 
       <ScrollArea className="flex-1 overflow-hidden">
