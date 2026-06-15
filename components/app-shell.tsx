@@ -16,6 +16,20 @@ import { cn } from "@/lib/utils"
 const MOBILE_NAV_HEIGHT = 84
 const FULLSCREEN_DRAG_THRESHOLD = 34
 
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false)
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const update = () => setReduced(media.matches)
+    update()
+    media.addEventListener("change", update)
+    return () => media.removeEventListener("change", update)
+  }, [])
+
+  return reduced
+}
+
 export function AppShell() {
   const { activePanel, settings } = useStore()
   const panelWidth = settings.panelWidth ?? 340
@@ -24,6 +38,13 @@ export function AppShell() {
   const [mobilePanelExpanded, setMobilePanelExpanded] = useState(false)
   const dragStartYRef = useRef<number | null>(null)
   const mapLeft = collapsed ? railWidth : railWidth + panelWidth
+  const prefersReducedMotion = usePrefersReducedMotion()
+  const mobileSheetTransition = prefersReducedMotion
+    ? "transition-none"
+    : "transition-[bottom,top,max-height,border-radius,transform,opacity] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+  const mobileContentTransition = prefersReducedMotion
+    ? "transition-none"
+    : "transition-[height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -37,11 +58,12 @@ export function AppShell() {
   }, [activePanel])
 
   useEffect(() => {
+    const delay = prefersReducedMotion ? 0 : 330
     const id = window.setTimeout(() => {
       window.dispatchEvent(new Event("resize"))
-    }, 330)
+    }, delay)
     return () => window.clearTimeout(id)
-  }, [mobilePanelExpanded])
+  }, [mobilePanelExpanded, prefersReducedMotion])
 
   function handleMobileHandlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
     dragStartYRef.current = event.clientY
@@ -173,11 +195,11 @@ export function AppShell() {
         {activePanel !== "map" ? (
           <div
             className={cn(
-              "pointer-events-auto absolute inset-x-0 mx-2 overflow-hidden bg-card/95 shadow-xl backdrop-blur-2xl",
-              "transition-[bottom,top,max-height,border-radius] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              "pointer-events-auto absolute inset-x-0 mx-2 overflow-hidden bg-card/95 shadow-xl backdrop-blur-2xl will-change-[top,bottom,max-height,border-radius,transform,opacity]",
+              mobileSheetTransition,
               mobilePanelExpanded
-                ? "bottom-[84px] top-0 max-h-none rounded-b-xl rounded-t-none"
-                : "bottom-[84px] max-h-[55dvh] rounded-xl",
+                ? "bottom-[84px] top-0 max-h-none rounded-b-xl rounded-t-none translate-y-0 opacity-100"
+                : "bottom-[84px] max-h-[55dvh] rounded-xl translate-y-0 opacity-100",
             )}
           >
             <button
@@ -187,14 +209,23 @@ export function AppShell() {
               onClick={() => setMobilePanelExpanded((v) => !v)}
               onPointerDown={handleMobileHandlePointerDown}
               onPointerUp={handleMobileHandlePointerUp}
-              className="flex w-full touch-none cursor-grab items-center justify-center px-4 pb-2 pt-2.5 active:cursor-grabbing"
+              className="group flex w-full touch-none cursor-grab items-center justify-center px-4 pb-2 pt-2.5 active:cursor-grabbing"
             >
-              <span className="h-1 w-12 rounded-full bg-primary/35 transition-all group-active:w-16" />
+              <span
+                className={cn(
+                  "h-1 rounded-full bg-primary/35",
+                  prefersReducedMotion ? "w-12" : "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  mobilePanelExpanded ? "w-16 bg-primary/55" : "w-12 group-active:w-16",
+                )}
+              />
             </button>
             <div
               className={cn(
-                "min-h-0 overflow-hidden transition-[height] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-                mobilePanelExpanded ? "h-[calc(100dvh-124px)]" : "h-[52dvh]",
+                "min-h-0 overflow-hidden will-change-[height,opacity,transform]",
+                mobileContentTransition,
+                mobilePanelExpanded
+                  ? "h-[calc(100dvh-124px)] translate-y-0 opacity-100"
+                  : "h-[52dvh] translate-y-0 opacity-100",
               )}
             >
               <PanelContent />
