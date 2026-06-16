@@ -26,6 +26,11 @@ export function BeaconMarker({
   const alarmActive = settings.visible && settings.soundEnabled && settings.continuousAlarm
   const pulseActive = settings.pulseEnabled && alarmActive
   const pulseDuration = Math.max(600, settings.pulseDurationMs ?? 1800)
+  const markerSize = Math.max(14, Math.min(64, settings.markerSize ?? 20))
+  const ringSize = Math.max(markerSize + 8, Math.round(markerSize * 1.4))
+  const innerRingSize = Math.max(markerSize, Math.round(markerSize * 1.15))
+  const shineSize = Math.max(4, Math.round(markerSize * 0.32))
+  const dotSize = Math.max(4, Math.round(markerSize * 0.3))
 
   // Detect each new move event and trigger toast.
   useEffect(() => {
@@ -64,14 +69,20 @@ export function BeaconMarker({
       ? `invert(100%) hue-rotate(calc(180deg - ${settings.mapHue}deg))`
       : "none"
 
+  const positionStyle = centered
+    ? { left: 0, top: 0 }
+    : { left: x, top: y }
+
   return (
     <div
-      className="pointer-events-none absolute z-20 size-7"
-      style={
-        centered
-          ? { left: 0, top: 0, transform: "translate(-50%, -50%)", ["--beacon-pulse-duration" as string]: `${pulseDuration}ms` }
-          : { left: x, top: y, transform: "translate(-50%, -50%)", ["--beacon-pulse-duration" as string]: `${pulseDuration}ms` }
-      }
+      className="pointer-events-none absolute z-20"
+      style={{
+        ...positionStyle,
+        width: ringSize,
+        height: ringSize,
+        transform: "translate(-50%, -50%)",
+        ["--beacon-pulse-duration" as string]: `${pulseDuration}ms`,
+      }}
     >
       {showToast && (
         <div
@@ -98,7 +109,8 @@ export function BeaconMarker({
       {pulseActive && (
         <span
           key={`ring-outer-${moveKey}`}
-          className="absolute left-1/2 top-1/2 -z-10 size-7 -translate-x-1/2 -translate-y-1/2"
+          className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2"
+          style={{ width: ringSize, height: ringSize }}
           aria-hidden
         >
           <span
@@ -110,7 +122,8 @@ export function BeaconMarker({
       {pulseActive && (
         <span
           key={`ring-inner-${moveKey}`}
-          className="absolute left-1/2 top-1/2 -z-10 size-5 -translate-x-1/2 -translate-y-1/2"
+          className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2"
+          style={{ width: innerRingSize, height: innerRingSize }}
           aria-hidden
         >
           <span
@@ -131,11 +144,13 @@ export function BeaconMarker({
         onClick={() => setOpen((o) => !o)}
         onMouseEnter={() => setOpen(true)}
         className={cn(
-          "pointer-events-auto absolute left-1/2 top-1/2 grid size-5 -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full",
+          "pointer-events-auto absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full",
           "transition-transform hover:scale-105 active:scale-95",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-beacon",
         )}
         style={{
+          width: markerSize,
+          height: markerSize,
           background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${color} 60%, white), ${color} 60%, color-mix(in srgb, ${color} 80%, black))`,
           boxShadow: [
             `0 0 0 2px color-mix(in srgb, ${color} 20%, white)`,
@@ -150,11 +165,15 @@ export function BeaconMarker({
         aria-expanded={open}
       >
         <span
-          className="absolute left-[22%] top-[14%] size-[32%] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.75) 0%, transparent 70%)" }}
+          className="absolute left-[22%] top-[14%] rounded-full"
+          style={{
+            width: shineSize,
+            height: shineSize,
+            background: "radial-gradient(circle, rgba(255,255,255,0.75) 0%, transparent 70%)",
+          }}
           aria-hidden
         />
-        <span className="size-1.5 rounded-full bg-white/90 shadow-sm" />
+        <span className="rounded-full bg-white/90 shadow-sm" style={{ width: dotSize, height: dotSize }} />
       </button>
 
       {open && (
