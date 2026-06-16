@@ -77,7 +77,7 @@ function playTone(audio: AudioContext, tone: Tone, volume: number, offsetMs: num
 
   const start = audio.currentTime + offsetMs / 1000
   const end = start + tone.durationMs / 1000
-  const vol = Math.max(0, Math.min(1, volume)) * 0.55
+  const vol = Math.max(0, Math.min(1, volume))
 
   gain.gain.setValueAtTime(0.0001, start)
   gain.gain.linearRampToValueAtTime(vol, start + 0.012)
@@ -89,7 +89,7 @@ function playTone(audio: AudioContext, tone: Tone, volume: number, offsetMs: num
   osc.stop(end + 0.03)
 }
 
-export function playAlarm(sound: AlarmSoundId = "beep", volume = 0.4) {
+export function playAlarm(sound: AlarmSoundId = "beep", volume = 1) {
   const audio = getCtx()
   if (!audio) return
   if (audio.state === "suspended") void audio.resume()
@@ -102,7 +102,7 @@ export function playAlarm(sound: AlarmSoundId = "beep", volume = 0.4) {
   }
 }
 
-export function playBeep(volume = 0.4, frequency = 880, durationMs = 120) {
+export function playBeep(volume = 1, frequency = 880, durationMs = 120) {
   const audio = getCtx()
   if (!audio) return
   if (audio.state === "suspended") void audio.resume()
