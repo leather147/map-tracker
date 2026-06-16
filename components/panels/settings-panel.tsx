@@ -30,6 +30,9 @@ const DIRECTIONS: { value: Direction; label: string }[] = [
   { value: "NW", label: "Северо-запад ↖" },
 ]
 
+const MIN_MARKER_SIZE = 30
+const MAX_MARKER_SIZE = 64
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
@@ -89,7 +92,7 @@ function IntervalRow({ value, onChange, disabled }: { value: number; onChange: (
 
 export function SettingsPanel() {
   const { settings, updateSettings, theme, toggleTheme, zoom, setZoom } = useStore()
-  const markerSize = settings.markerSize ?? 20
+  const markerSize = Math.max(MIN_MARKER_SIZE, Math.min(MAX_MARKER_SIZE, settings.markerSize ?? MIN_MARKER_SIZE))
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -117,7 +120,7 @@ export function SettingsPanel() {
               </label>
             </div>
             <Divider />
-            <SliderRow label="Размер маркера" value={markerSize} display={`${markerSize} px`} min={14} max={64} step={2} onChange={(v) => updateSettings({ markerSize: v })} />
+            <SliderRow label="Размер маркера" value={markerSize} display={`${markerSize} px`} min={MIN_MARKER_SIZE} max={MAX_MARKER_SIZE} step={2} onChange={(v) => updateSettings({ markerSize: v })} />
             <Divider />
             <ToggleRow label="Тёмная тема" desc="Синяя карта, тёмный интерфейс" checked={theme === "dark"} onChange={toggleTheme} />
           </Section>
