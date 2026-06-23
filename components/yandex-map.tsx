@@ -71,18 +71,27 @@ function getRouteCoordinates(route: any): LatLng[] {
   return cleaned
 }
 
+function pushLeg(result: LatLng[], from: LatLng, to: LatLng) {
+  if (result.length === 0) result.push(from)
+  const last = result[result.length - 1]
+  if (Math.abs(last[0] - from[0]) > 0.000001 || Math.abs(last[1] - from[1]) > 0.000001) result.push(from)
+  result.push(to)
+}
+
 async function buildSegmentedRoadRoute(ymaps: any, points: LatLng[]): Promise<LatLng[]> {
   const result: LatLng[] = []
   for (let i = 0; i < points.length - 1; i += 1) {
-    let segmentRoute: any
+    const from = points[i]
+    const to = points[i + 1]
     try {
-      segmentRoute = await ymaps.route([points[i], points[i + 1]], { routingMode: "auto" })
-    } catch {
-      throw new Error(`Route leg ${i + 1} failed`)
-    }
-    const segmentCoords = getRouteCoordinates(segmentRoute)
-    if (segmentCoords.length < 2) throw new Error(`Route leg ${i + 1} has no road geometry`)
-    result.push(...(result.length === 0 ? segmentCoords : segmentCoords.slice(1)))
+      const segmentRoute = await ymaps.route([from, to], { routingMode: "auto" })
+      const segmentCoords = getRouteCoordinates(segmentRoute)
+      if (segmentCoords.length >= 2) {
+        result.push(...(result.length === 0 ? segmentCoords : segmentCoords.slice(1)))
+        continue
+      }
+    } catch {}
+    pushLeg(result, from, to)
   }
   return result
 }
@@ -235,7 +244,7 @@ export function YandexMap() {
       .then((coords) => {
         if (cancelled) return
         if (coords.length < 2) {
-          setRouteBuildStateRef.current("error", "No road geometry")
+          setRouteBuildStateRef.current("error", "No route geometry")
           return
         }
         const routeLine = new ymaps.Polyline(coords, { hintContent: "KZ SPB" }, { strokeColor: ROUTE_COLOR, strokeOpacity: 0.96, strokeWidth: 4, strokeStyle: "solid" })
@@ -251,8 +260,8 @@ export function YandexMap() {
           if (bounds) map.setBounds(bounds, { checkZoomRange: true, zoomMargin: 64, duration: 450 })
         } catch {}
       })
-      .catch((error) => {
-        if (!cancelled) setRouteBuildStateRef.current("error", error instanceof Error ? error.message : "Road route failed")
+      .catch(() => {
+        if (!cancelled) setRouteBuildStateRef.current("error", "No route geometry")
       })
 
     return () => { cancelled = true; clearRoute() }
@@ -316,7 +325,7 @@ export function YandexMap() {
 
       {status === "ready" && settings.routeMode && routeStatus === "building" && (
         <div className="pointer-events-none absolute left-4 top-4 rounded-full bg-card/95 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow backdrop-blur">
-          Building road route...
+          Building route...
         </div>
       )}
 
